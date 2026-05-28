@@ -683,3 +683,30 @@ async def startup():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+
+# ─── Test connectivité API ───────────────────────────────────────────────────
+
+@app.get("/admin/test-api")
+async def admin_test_api(request: Request):
+    require_admin(request)
+    import urllib.request, urllib.error, json as _json
+    api_key = os.environ.get("API_FOOTBALL_KEY", "")
+    results = {}
+    results["cle_presente"] = bool(api_key)
+    results["cle_debut"] = api_key[:8] + "..." if api_key else "ABSENTE"
+    try:
+        urllib.request.urlopen("https://www.google.com", timeout=5)
+        results["reseau_general"] = "OK"
+    except Exception as e:
+        results["reseau_general"] = f"ECHEC: {str(e)}"
+    try:
+        req = urllib.request.Request("https://v3.football.api-sports.io/status")
+        req.add_header("x-apisports-key", api_key)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = _json.loads(resp.read())
+            results["api_football"] = "OK"
+            results["api_reponse"] = str(data)[:400]
+    except Exception as e:
+        results["api_football"] = f"ECHEC: {str(e)}"
+    return JSONResponse(results)
