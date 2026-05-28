@@ -710,3 +710,26 @@ async def admin_test_api(request: Request):
     except Exception as e:
         results["api_football"] = f"ECHEC: {str(e)}"
     return JSONResponse(results)
+
+
+@app.get("/admin/test-api-fixtures")
+async def admin_test_fixtures(request: Request, season: int = 2025, journee: int = 1):
+    require_admin(request)
+    import urllib.request, json as _json, os
+    api_key = os.environ.get("API_FOOTBALL_KEY", "")
+    url = f"https://v3.football.api-sports.io/fixtures?league=61&season={season}&round=Regular+Season+-+{journee}"
+    req = urllib.request.Request(url)
+    req.add_header("x-apisports-key", api_key)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = _json.loads(resp.read())
+            nb = len(data.get("response", []))
+            sample = data.get("response", [])[:2]
+            return JSONResponse({
+                "url": url,
+                "nb_resultats": nb,
+                "erreurs_api": data.get("errors", []),
+                "exemple": str(sample)[:600]
+            })
+    except Exception as e:
+        return JSONResponse({"erreur": str(e)})
