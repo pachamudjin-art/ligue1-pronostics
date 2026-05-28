@@ -17,20 +17,25 @@ LEAGUE_ID = 61  # Ligue 1
 
 
 def _request(endpoint: str, params: dict) -> dict | None:
-    if not API_KEY:
+    # Relit la clé à chaque appel pour prendre en compte les changements de variable d'env
+    api_key = os.environ.get("API_FOOTBALL_KEY", "")
+    if not api_key:
         print("API_FOOTBALL_KEY non définie.")
         return None
 
     query = "&".join(f"{k}={v}" for k, v in params.items())
     url = f"{BASE_URL}/{endpoint}?{query}"
     req = urllib.request.Request(url)
-    req.add_header("x-apisports-key", API_KEY)
+    req.add_header("x-apisports-key", api_key)
 
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read())
     except urllib.error.URLError as e:
-        print(f"Erreur API-Football : {e}")
+        print(f"Erreur API-Football ({url}): {e}")
+        return None
+    except Exception as e:
+        print(f"Erreur inattendue API-Football: {e}")
         return None
 
 
