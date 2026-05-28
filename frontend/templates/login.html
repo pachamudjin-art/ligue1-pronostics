@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connexion — L1 Pronostics</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-box">
+    <div class="login-title">⚽ L1 PRONOSTICS</div>
+    <div class="login-sub">Connectez-vous pour pronostiquer</div>
+
+    {% if error %}
+    <div class="error-msg">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/login" autocomplete="on">
+      <div class="field">
+        <label for="username">Nom d'utilisateur</label>
+        <input type="text" id="username" name="username"
+               placeholder="ex: Malherbe" autofocus autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="password">Mot de passe</label>
+        <input type="password" id="password" name="password"
+               placeholder="••••••••" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; padding:.7rem; font-size:1rem; margin-top:.5rem;">
+        Se connecter
+      </button>
+    </form>
+
+    <p style="margin-top:1.5rem; font-size:.75rem; color:var(--muted); text-align:center;">
+      Mot de passe initial = votre prénom en minuscules<br>
+      (ex: <em>malherbe</em> pour Malherbe)
+    </p>
+  </div>
+</div>
+</body>
+</html>

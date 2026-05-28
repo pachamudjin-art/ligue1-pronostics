@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Journée {{ matchday.number }} — L1 Pronostics{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <!-- Navigation journées -->
+  <div class="journee-nav">
+    {% set prev = matchday.number - 1 %}
+    {% set next = matchday.number + 1 %}
+    {% if prev >= 1 and prev in all_matchdays %}
+      <a href="/journee/{{ prev }}" class="btn btn-secondary btn-sm">← J{{ prev }}</a>
+    {% endif %}
+
+    <select onchange="goToJournee(this)">
+      {% for jn in all_matchdays %}
+      <option value="{{ jn }}" {% if jn == matchday.number %}selected{% endif %}>
+        Journée {{ jn }}
+      </option>
+      {% endfor %}
+    </select>
+
+    {% if next in all_matchdays %}
+      <a href="/journee/{{ next }}" class="btn btn-secondary btn-sm">J{{ next }} →</a>
+    {% endif %}
+
+    <a href="/classement" class="btn btn-secondary btn-sm" style="margin-left:auto">🏆 Classement</a>
+  </div>
+
+  <h1>Journée {{ matchday.number }}</h1>
+
+  <!-- Estimation de score -->
+  {% set first_ko = namespace(val=None) %}
+  {% for m in matches %}{% if first_ko.val is none %}{% set first_ko.val = m.kickoff_time %}{% endif %}{% endfor %}
+
+  <div class="estimation-card">
+    <div class="estimation-label">🎯 Mon estimation de score</div>
+
+    {% if estimate_locked %}
+      <!-- Estimation verrouillée -->
+      <div id="estimation_display">
+        {% if my_estimate %}
+          <span class="score-display">{{ my_estimate.estimated_score }} pts estimés</span>
+          <span class="badge badge-lock" style="margin-left:.5rem">Verrouillé</span>
+        {% else %}
+          <span style="color:var(--muted); font-size:.85rem">Aucune estimation saisie</span>
+        {% endif %}
+      </div>
+    {% else %}
+      <!-- Formulaire estimation -->
+      <div id="estimation_display">
+        {% if my_estimate %}
+          <span class="score-display">{{ my_estimate.estimated_score }} pts estimés</span>
+        {% endif %}
+      </div>
+
+      <div id="estimation_form" style="display:{% if my_estimate %}none{% else %}flex{% endif %}; align-items:center; gap:.5rem;">
+        <input type="number" id="estimation_input" class="score-in"
+               min="0" max="{{ matches|length * 6 + 2 }}"
+               value="{% if my_estimate %}{{ my_estimate.estimated_score }}{% endif %}"
+               placeholder="pts" style="width:4rem;">
+        <button class="btn btn-primary btn-sm" onclick="submitEstimation({{ matchday.id }})">
+          Valider
+        </button>
+      </div>
+
+      {% if my_estimate %}
+      <button id="estimation_edit_btn" class="btn btn-secondary btn-sm"
+              onclick="document.getElementById('estimation_form').style.display='flex';this.style.display='none'">
+        Modifier
+      </button>
+      {% endif %}
+    {% endif %}
+
+    <span style="font-size:.75rem; color:var(--muted); margin-left:auto">
+      Bonus de 2 pts si estimation exacte
+    </span>
+  </div>
+
+  <!-- Liste des matchs -->
+  {% if matches %}
+    {% for m in matches %}
+    {% set locked = m.kickoff_time <= now_utc %}
+    {% set has_result = m.home_score is not none and m.away_score is not none %}
+    {% set my_p = my_pronostics.get(m.id) %}
+    {% set pts_info = points_by_match.get(m.id) %}
+    {% set all_p = all_pronostics.get(m.id, []) %}
+
+    <div class="match-card {% if locked %}locked{% endif %} {% if has_result %}has-result{% endif %}">
+      <div class="match-header">
+        <div class="match-teams">
+          <span>{{ m.home_team }}</span>
+          <span class="vs-sep">–</span>
+          <span>{{ m.away_team }}</span>
+        </div>
+        <div class="match-meta">
+          <!-- Heure en heure locale (affichée via JS) -->
+          <span class="kickoff-local" data-utc="{{ m.kickoff_time }}"></span>
+
+          {% if has_result %}
+            <span class="real-score">{{ m.home_score }} – {{ m.away_score }}</span>
+            {% if pts_info %}
+              {% if pts_info.label == 'BB' %}<span class="badge badge-bb">BB +{{ pts_info.points }}</span>
+              {% elif pts_info.label == 'PP' %}<span class="badge badge-pp">PP +{{ pts_info.points }}</span>
+              {% elif pts_info.label == 'PA' %}<span class="badge badge-pa">PA +{{ pts_info.points }}</span>
+              {% elif pts_info.label == 'PJ' %}<span class="badge badge-pj">PJ +{{ pts_info.points }}</span>
+              {% else %}<span class="badge badge-zero">0 pt</span>{% endif %}
+            {% endif %}
+          {% elif locked %}
+            <span class="badge badge-lock">Verrouillé</span>
+          {% else %}
+            {% set ko = m.kickoff_time %}
+            <span class="badge badge-open">Ouvert</span>
+            <span class="countdown-txt" data-kickoff="{{ ko }}"></span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Mon pronostic -->
+      <div style="margin-top:.5rem;">
+        {% if locked %}
+          <!-- Verrouillé : afficher uniquement -->
+          <div class="my-prono">
+            <span style="font-size:.8rem; color:var(--muted);">Mon prono :</span>
+            {% if my_p %}
+              <span class="score-display">{{ my_p.home_score }} – {{ my_p.away_score }}</span>
+            {% else %}
+              <span style="color:var(--muted); font-size:.85rem">Non pronostiqué</span>
+            {% endif %}
+          </div>
+        {% else %}
+          <!-- Formulaire pronostic -->
+          <div class="my-prono">
+            <span style="font-size:.8rem; color:var(--muted);">Mon prono :</span>
+
+            <div id="prono_display_{{ m.id }}">
+              {% if my_p %}
+                <span class="score-display">{{ my_p.home_score }} – {{ my_p.away_score }}</span>
+              {% endif %}
+            </div>
+
+            <div id="prono_form_{{ m.id }}" class="score-form"
+                 style="display:{% if my_p %}none{% else %}flex{% endif %};">
+              <div class="score-input-wrap">
+                <input type="number" id="h_{{ m.id }}" class="score-in"
+                       min="0" max="20"
+                       value="{% if my_p %}{{ my_p.home_score }}{% endif %}"
+                       placeholder="0">
+                <span class="score-sep">–</span>
+                <input type="number" id="a_{{ m.id }}" class="score-in"
+                       min="0" max="20"
+                       value="{% if my_p %}{{ my_p.away_score }}{% endif %}"
+                       placeholder="0">
+              </div>
+              <button id="btn_{{ m.id }}" class="btn btn-primary btn-sm"
+                      onclick="submitProno({{ m.id }})">✓</button>
+            </div>
+
+            {% if my_p %}
+            <button id="edit_btn_{{ m.id }}" class="btn btn-secondary btn-sm"
+                    onclick="editProno({{ m.id }})">Modifier</button>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Pronostics des autres joueurs (visibles si match commencé) -->
+      {% if locked and all_p %}
+      <div class="all-pronos">
+        <div style="font-size:.75rem; color:var(--muted); margin-bottom:.35rem; text-transform:uppercase; letter-spacing:.05em;">
+          Pronostics
+        </div>
+        <div class="prono-grid">
+          {% for pp in all_p %}
+          <div class="prono-chip">
+            <span class="player-name">{{ pp.username }}</span>
+            <span class="prono-score">{{ pp.home_score }}–{{ pp.away_score }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="card" style="text-align:center; color:var(--muted); padding:2rem;">
+      Aucun match pour cette journée.<br>
+      {% if user.is_admin %}
+        <a href="/admin/journee/{{ matchday.number }}" class="btn btn-secondary btn-sm" style="margin-top:.75rem">
+          ⚙ Ajouter des matchs
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Affichage des horaires en heure locale
+document.querySelectorAll(".kickoff-local").forEach(el => {
+  const utc = el.dataset.utc;
+  if (!utc) return;
+  const d = new Date(utc.replace(" ", "T") + "Z");
+  el.textContent = d.toLocaleDateString("fr-FR", {weekday:"short", day:"numeric", month:"short"})
+    + " " + d.toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"});
+});
+
+// Countdown
+document.querySelectorAll(".countdown-txt").forEach(el => {
+  const ko = new Date(el.dataset.kickoff.replace(" ", "T") + "Z");
+  function tick() {
+    const diff = ko - Date.now();
+    if (diff <= 0) { el.textContent = ""; return; }
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    el.textContent = h > 0 ? `⏱ ${h}h${String(m).padStart(2,"0")}` : `⏱ ${m}m${String(s).padStart(2,"0")}s`;
+    setTimeout(tick, 1000);
+  }
+  tick();
+});
+</script>
+{% endblock %}

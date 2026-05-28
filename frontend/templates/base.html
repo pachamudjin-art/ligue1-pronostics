@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Ligue 1 Pronostics{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+{% if user %}
+<nav>
+  <a class="nav-brand" href="/">⚽ L1 PRONOSTICS</a>
+  <div class="nav-links">
+    <a href="/" {% if request.url.path.startswith('/journee') %}class="active"{% endif %}>Journées</a>
+    <a href="/classement" {% if request.url.path == '/classement' %}class="active"{% endif %}>Classement</a>
+    <a href="/chat" {% if request.url.path == '/chat' %}class="active"{% endif %}>💬 Vestiaire</a>
+    {% if user.is_admin %}
+    <a href="/admin" {% if request.url.path.startswith('/admin') %}class="active"{% endif %}>⚙ Admin</a>
+    {% endif %}
+  </div>
+  <div class="nav-user">
+    <strong>{{ user.username }}</strong>
+    <a href="/logout" class="btn btn-secondary btn-sm">Déco</a>
+  </div>
+</nav>
+{% endif %}
+
+{% block content %}{% endblock %}
+
+<div id="toast"></div>
+<script src="/static/js/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

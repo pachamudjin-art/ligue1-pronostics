@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Chat — L1 Pronostics{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:700px;">
+
+  <h1>💬 Vestiaire</h1>
+  <p style="color:var(--muted); font-size:.85rem; margin-bottom:1.2rem;">
+    Discussion entre pronostiqueurs — visible par tous les participants
+  </p>
+
+  <!-- Zone messages -->
+  <div class="card" style="padding:0; overflow:hidden; margin-bottom:1rem;">
+    <div id="chat-box"
+         style="height:60vh; overflow-y:auto; padding:1rem; display:flex; flex-direction:column; gap:.6rem;">
+      {% for msg in messages %}
+      <div class="chat-msg {% if msg.username == user.username %}mine{% endif %}"
+           data-id="{{ msg.id }}">
+        <div class="chat-bubble">
+          <div class="chat-meta">
+            <span class="chat-author">{{ msg.username }}</span>
+            <span class="chat-time">{{ msg.created_at[:16].replace('T',' ') }}</span>
+            {% if msg.username == user.username or user.is_admin %}
+            <button class="chat-del-btn" onclick="deleteMsg({{ msg.id }}, this)" title="Supprimer">✕</button>
+            {% endif %}
+          </div>
+          <div class="chat-text">{{ msg.message }}</div>
+        </div>
+      </div>
+      {% else %}
+      <div id="empty-msg" style="text-align:center; color:var(--muted); margin:auto; font-size:.9rem;">
+        Aucun message pour l'instant.<br>Soyez le premier à briser la glace ! ⚽
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Saisie -->
+    <div style="border-top:1px solid var(--border); padding:.75rem 1rem; display:flex; gap:.5rem; background:var(--surface2);">
+      <input id="chat-input" type="text" maxlength="500"
+             placeholder="Votre message…"
+             style="flex:1; background:var(--surface); border:1px solid var(--border);
+                    border-radius:7px; padding:.5rem .8rem; color:var(--text);
+                    font-family:'DM Sans',sans-serif; font-size:.9rem; outline:none;"
+             onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); sendMsg(); }">
+      <button class="btn btn-primary" onclick="sendMsg()" style="white-space:nowrap;">
+        Envoyer
+      </button>
+    </div>
+  </div>
+
+  <p style="font-size:.75rem; color:var(--muted); text-align:center;">
+    Actualisation automatique toutes les 15 secondes · Entrée pour envoyer
+  </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.chat-msg { display:flex; }
+.chat-msg.mine { justify-content:flex-end; }
+
+.chat-bubble {
+  max-width: 78%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: .5rem .8rem;
+}
+.chat-msg.mine .chat-bubble {
+  background: rgba(232,196,90,.12);
+  border-color: rgba(232,196,90,.25);
+}
+
+.chat-meta {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  margin-bottom: .2rem;
+}
+.chat-author {
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+.chat-msg.mine .chat-author { color: var(--accent); }
+.chat-time {
+  font-size: .68rem;
+  color: var(--muted);
+}
+.chat-del-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .7rem;
+  padding: 0 .2rem;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.chat-bubble:hover .chat-del-btn { opacity: 1; }
+.chat-text {
+  font-size: .9rem;
+  color: var(--text);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+</style>
+
+<script>
+const ME = "{{ user.username }}";
+const IS_ADMIN = {{ 'true' if user.is_admin else 'false' }};
+let lastId = {{ messages[-1].id if messages else 0 }};
+const box = document.getElementById("chat-box");
+
+// Scroll initial en bas
+box.scrollTop = box.scrollHeight;
+
+function formatTime(isoStr) {
+  // isoStr ex: "2025-09-14 19:32:00"
+  const d = new Date(isoStr.replace(' ', 'T') + 'Z');
+  return d.toLocaleDateString('fr-FR', {day:'numeric', month:'short'})
+    + ' ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+}
+
+function renderMsg(msg) {
+  const isMine = msg.username === ME;
+  const canDel = isMine || IS_ADMIN;
+
+  const div = document.createElement("div");
+  div.className = "chat-msg" + (isMine ? " mine" : "");
+  div.dataset.id = msg.id;
+
+  div.innerHTML = `
+    <div class="chat-bubble">
+      <div class="chat-meta">
+        <span class="chat-author">${msg.username}</span>
+        <span class="chat-time">${formatTime(msg.created_at)}</span>
+        ${canDel ? `<button class="chat-del-btn" onclick="deleteMsg(${msg.id}, this)" title="Supprimer">✕</button>` : ''}
+      </div>
+      <div class="chat-text">${escHtml(msg.message)}</div>
+    </div>`;
+  return div;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+async function sendMsg() {
+  const input = document.getElementById("chat-input");
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = "";
+  input.focus();
+
+  const fd = new FormData();
+  fd.append("message", text);
+
+  try {
+    const res = await fetch("/chat/send", { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.ok) {
+      const empty = document.getElementById("empty-msg");
+      if (empty) empty.remove();
+      const el = renderMsg(data.message);
+      box.appendChild(el);
+      box.scrollTop = box.scrollHeight;
+      lastId = data.message.id;
+    } else {
+      alert(data.error || "Erreur envoi");
+    }
+  } catch(e) {
+    alert("Erreur réseau");
+  }
+}
+
+async function deleteMsg(msgId, btn) {
+  if (!confirm("Supprimer ce message ?")) return;
+  const fd = new FormData();
+  fd.append("message_id", msgId);
+  const res = await fetch("/chat/delete", { method: "POST", body: fd });
+  const data = await res.json();
+  if (data.ok) {
+    const el = box.querySelector(`[data-id="${msgId}"]`);
+    if (el) el.remove();
+  }
+}
+
+// Polling toutes les 15s
+async function poll() {
+  try {
+    const res = await fetch(`/chat/messages?after_id=${lastId}`);
+    const data = await res.json();
+    if (data.ok && data.messages.length > 0) {
+      const empty = document.getElementById("empty-msg");
+      if (empty) empty.remove();
+      const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+      for (const msg of data.messages) {
+        // Ne pas re-ajouter nos propres messages déjà affichés
+        if (!box.querySelector(`[data-id="${msg.id}"]`)) {
+          box.appendChild(renderMsg(msg));
+          lastId = msg.id;
+        }
+      }
+      if (atBottom) box.scrollTop = box.scrollHeight;
+    }
+  } catch(e) {}
+}
+
+setInterval(poll, 15000);
+</script>
+{% endblock %}
