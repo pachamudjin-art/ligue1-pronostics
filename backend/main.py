@@ -710,3 +710,65 @@ async def chat_delete(request: Request, message_id: int = Form(...)):
     conn.commit()
     conn.close()
     return JSONResponse({"ok": True})
+
+
+# ─── Debug admin ─────────────────────────────────────────────────────────────
+
+@app.get("/admin/debug", response_class=HTMLResponse)
+async def admin_debug(request: Request):
+    require_admin(request)
+    conn = get_db()
+
+    matches = conn.execute("""
+        SELECT m.id, m.home_team, m.away_team, m.kickoff_time,
+               m.home_score, m.away_score, m.status, md.number as journee
+        FROM matches m JOIN matchdays md ON md.id = m.matchday_id
+        ORDER BY md.number, m.kickoff_time
+    """).fetchall()
+
+    pronostics = conn.execute("""
+        SELECT p.id, u.username, m.home_team, m.away_team,
+               p.home_score as pred_h, p.away_score as pred_a,
+               m.home_score as real_h, m.away_score as real_a,
+               m.kickoff_time
+        FROM pronostics p
+        JOIN users u ON u.id = p.user_id
+        JOIN matches m ON m.id = p.match_id
+        ORDER BY u.username, m.kickoff_time
+    """).fetchall()
+
+    conn.close()
+
+    rows_m = "".join(
+        f"<tr><td>J{m['journee']}</td><td>{m['home_team']} – {m['away_team']}</td>"
+        f"<td>{m['kickoff_time']}</td>"
+        f"<td style='color:{'#2ea043' if m['home_score'] is not None else '#e74c3c'}'>"
+        f"{'%d–%d' % (m['home_score'], m['away_score']) if m['home_score'] is not None else 'PAS DE SCORE'}</td>"
+        f"<td>{m['status']}</td></tr>"
+        for m in matches
+    )
+
+    rows_p = "".join(
+        f"<tr><td>{p['username']}</td><td>{p['home_team']} – {p['away_team']}</td>"
+        f"<td>{p['pred_h']}–{p['pred_a']}</td>"
+        f"<td>{'%d–%d' % (p['real_h'], p['real_a']) if p['real_h'] is not None else '—'}</td>"
+        f"<td>{p['kickoff_time']}</td></tr>"
+        for p in pronostics
+    )
+
+    html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <style>body{{font-family:sans-serif;background:#0d1117;color:#e6edf3;padding:2rem}}
+    table{{border-collapse:collapse;width:100%;margin-bottom:2rem;font-size:.85rem}}
+    th{{background:#21262d;padding:.5rem .75rem;text-align:left;color:#8b949e}}
+    td{{padding:.45rem .75rem;border-bottom:1px solid #30363d}}
+    h2{{color:#e8c45a;margin:1.5rem 0 .75rem}}</style></head><body>
+    <h2>Matchs en base ({len(matches)})</h2>
+    <table><thead><tr><th>J</th><th>Match</th><th>Kickoff UTC</th><th>Score</th><th>Statut</th></tr></thead>
+    <tbody>{rows_m}</tbody></table>
+    <h2>Pronostics en base ({len(pronostics)})</h2>
+    <table><thead><tr><th>Joueur</th><th>Match</th><th>Prono</th><th>Score réel</th><th>Kickoff UTC</th></tr></thead>
+    <tbody>{rows_p}</tbody></table>
+    <p style="color:#8b949e;font-size:.8rem">Heure serveur UTC : {utcnow_str()}</p>
+    </body></html>"""
+
+    return HTMLResponse(html)
