@@ -109,13 +109,22 @@ function goToJournee(select, seasonId) {
 // ── Admin : importer depuis l'API ─────────────────────────────
 async function importFromApi(matchdayNumber) {
   const btn = document.getElementById("btn_import_api");
-  if (btn) btn.disabled = true;
+  const origLabel = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Import en cours…"; }
+  toast("Import en cours, patientez 10-15 secondes…", "ok", 15000);
 
   const fd = new FormData();
   fd.append("matchday_number", matchdayNumber);
 
+  // Timeout explicite de 60 secondes
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000);
+
   try {
-    const res = await fetch("/admin/import-api", { method: "POST", body: fd });
+    const res = await fetch("/admin/import-api", {
+      method: "POST", body: fd, signal: controller.signal
+    });
+    clearTimeout(timeout);
     const data = await res.json();
     if (data.ok) {
       toast(`✓ ${data.imported} match(s) importé(s)`, "ok");
@@ -127,18 +136,31 @@ async function importFromApi(matchdayNumber) {
       toast(data.error || "Erreur API", "err");
     }
   } catch (e) {
-    toast("Erreur réseau", "err");
+    clearTimeout(timeout);
+    if (e.name === "AbortError") {
+      toast("Délai dépassé (60s) — vérifiez votre clé API", "err");
+    } else {
+      toast("Erreur réseau : " + e.message, "err");
+    }
   }
-  if (btn) btn.disabled = false;
+  if (btn) { btn.disabled = false; btn.textContent = origLabel; }
 }
 
 // ── Admin : mettre à jour les scores via API ──────────────────
 async function updateScoresApi() {
   const btn = document.getElementById("btn_update_scores");
-  if (btn) btn.disabled = true;
+  const origLabel = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Mise à jour…"; }
+  toast("Récupération des scores en cours…", "ok", 15000);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000);
 
   try {
-    const res = await fetch("/admin/update-scores-api", { method: "POST" });
+    const res = await fetch("/admin/update-scores-api", {
+      method: "POST", signal: controller.signal
+    });
+    clearTimeout(timeout);
     const data = await res.json();
     if (data.ok) {
       toast(`✓ ${data.updated} score(s) mis à jour`, "ok");
@@ -147,9 +169,14 @@ async function updateScoresApi() {
       toast("Erreur API", "err");
     }
   } catch (e) {
-    toast("Erreur réseau", "err");
+    clearTimeout(timeout);
+    if (e.name === "AbortError") {
+      toast("Délai dépassé (60s)", "err");
+    } else {
+      toast("Erreur réseau : " + e.message, "err");
+    }
   }
-  if (btn) btn.disabled = false;
+  if (btn) { btn.disabled = false; btn.textContent = origLabel; }
 }
 
 // ── Countdown ────────────────────────────────────────────────
