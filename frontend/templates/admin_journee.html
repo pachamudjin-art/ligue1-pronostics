@@ -31,72 +31,71 @@
     </div>
   </div>
 
-  <!-- Matchs existants -->
+  <!-- Matchs existants — une carte par match -->
   {% if matches %}
-  <div class="card" style="padding:0; overflow:hidden; margin-bottom:1.2rem;">
-    <table class="admin-table">
-      <thead>
-        <tr>
-          <th>Équipes</th>
-          <th>Coup d'envoi (UTC)</th>
-          <th>Score</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for m in matches %}
-        <tr>
-          <td><strong>{{ m.home_team }}</strong> – {{ m.away_team }}</td>
-          <td>
-            <!-- Modifier l'horaire -->
-            <form method="post" action="/admin/match/update-kickoff"
-                  style="display:flex; gap:.3rem; align-items:center; flex-wrap:wrap;">
-              <input type="hidden" name="match_id" value="{{ m.id }}">
-              <input type="date" name="kickoff_date" class="admin-in"
-                     style="width:auto;" value="{{ m.kickoff_time[:10] }}">
-              <input type="time" name="kickoff_time" class="admin-in"
-                     style="width:auto;" value="{{ m.kickoff_time[11:16] }}">
-              <button type="submit" class="btn btn-secondary btn-sm">⏱</button>
-            </form>
-          </td>
-          <td>
-            {% if m.home_score is not none %}
-              <span class="real-score">{{ m.home_score }} – {{ m.away_score }}</span>
-            {% else %}
-              <span style="color:var(--muted);">—</span>
-            {% endif %}
-          </td>
-          <td>
-            <div style="display:flex; gap:.4rem; flex-wrap:wrap; align-items:center;">
-              <!-- Saisir / modifier le score -->
-              <form method="post" action="/admin/match/update-score"
-                    style="display:flex; gap:.3rem; align-items:center;">
-                <input type="hidden" name="match_id" value="{{ m.id }}">
-                <input type="number" name="home_score" class="admin-in score-in"
-                       style="width:2.8rem;" min="0" max="20"
-                       value="{{ m.home_score if m.home_score is not none else '' }}"
-                       placeholder="D">
-                <span style="color:var(--muted);">–</span>
-                <input type="number" name="away_score" class="admin-in score-in"
-                       style="width:2.8rem;" min="0" max="20"
-                       value="{{ m.away_score if m.away_score is not none else '' }}"
-                       placeholder="E">
-                <button type="submit" class="btn btn-primary btn-sm">✓</button>
-              </form>
+    {% for m in matches %}
+    <div class="card" style="margin-bottom:.85rem;">
 
-              <!-- Supprimer -->
-              <form method="post" action="/admin/match/delete"
-                    onsubmit="return confirm('Supprimer ce match et ses pronostics ?')">
-                <input type="hidden" name="match_id" value="{{ m.id }}">
-                <button type="submit" class="btn btn-danger btn-sm">✕</button>
-              </form>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+      <!-- Équipes + score actuel -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem; margin-bottom:.9rem;">
+        <div style="font-weight:600; font-size:1rem;">
+          {{ m.home_team }} <span style="color:var(--muted);">–</span> {{ m.away_team }}
+        </div>
+        {% if m.home_score is not none %}
+          <span class="real-score">{{ m.home_score }} – {{ m.away_score }}</span>
+        {% else %}
+          <span class="badge badge-open">Pas de score</span>
+        {% endif %}
+      </div>
+
+      <!-- Formulaire horaire -->
+      <div style="margin-bottom:.75rem;">
+        <div style="font-size:.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:.35rem;">
+          ⏱ Coup d'envoi (UTC)
+        </div>
+        <form method="post" action="/admin/match/update-kickoff"
+              style="display:flex; gap:.4rem; align-items:center; flex-wrap:wrap;">
+          <input type="hidden" name="match_id" value="{{ m.id }}">
+          <input type="date" name="kickoff_date" class="admin-in"
+                 style="width:auto;" value="{{ m.kickoff_time[:10] }}" required>
+          <input type="time" name="kickoff_time" class="admin-in"
+                 style="width:auto;" value="{{ m.kickoff_time[11:16] }}" required>
+          <button type="submit" class="btn btn-secondary btn-sm">Enregistrer</button>
+        </form>
+      </div>
+
+      <!-- Formulaire score -->
+      <div style="margin-bottom:.75rem;">
+        <div style="font-size:.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:.35rem;">
+          ⚽ Score final
+        </div>
+        <form method="post" action="/admin/match/update-score"
+              style="display:flex; gap:.4rem; align-items:center; flex-wrap:wrap;">
+          <input type="hidden" name="match_id" value="{{ m.id }}">
+          <input type="number" name="home_score" class="admin-in"
+                 style="width:3.5rem; text-align:center;" min="0" max="20"
+                 value="{{ m.home_score if m.home_score is not none else '' }}"
+                 placeholder="Dom" required>
+          <span style="color:var(--muted); font-weight:700;">–</span>
+          <input type="number" name="away_score" class="admin-in"
+                 style="width:3.5rem; text-align:center;" min="0" max="20"
+                 value="{{ m.away_score if m.away_score is not none else '' }}"
+                 placeholder="Ext" required>
+          <button type="submit" class="btn btn-primary btn-sm">✓ Valider</button>
+        </form>
+      </div>
+
+      <!-- Supprimer -->
+      <div style="border-top:1px solid var(--border); padding-top:.65rem; margin-top:.65rem;">
+        <form method="post" action="/admin/match/delete"
+              onsubmit="return confirm('Supprimer ce match et tous ses pronostics ?')">
+          <input type="hidden" name="match_id" value="{{ m.id }}">
+          <button type="submit" class="btn btn-danger btn-sm">✕ Supprimer ce match</button>
+        </form>
+      </div>
+
+    </div>
+    {% endfor %}
   {% else %}
     <div class="card" style="text-align:center; color:var(--muted); padding:1.5rem; margin-bottom:1.2rem;">
       Aucun match pour cette journée.
@@ -104,33 +103,25 @@
   {% endif %}
 
   <!-- Ajouter un match manuellement -->
-  <div class="card">
+  <div class="card" style="margin-top:.5rem;">
     <h2 style="margin-bottom:.85rem;">Ajouter un match manuellement</h2>
     <form method="post" action="/admin/match/add">
       <input type="hidden" name="matchday_id" value="{{ matchday.id }}">
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:.6rem; margin-bottom:.75rem;">
         <div>
-          <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.25rem;">
-            Équipe domicile
-          </label>
+          <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.25rem;">Équipe domicile</label>
           <input type="text" name="home_team" class="admin-in" placeholder="ex: Paris Saint-Germain" required>
         </div>
         <div>
-          <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.25rem;">
-            Équipe extérieur
-          </label>
+          <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.25rem;">Équipe extérieur</label>
           <input type="text" name="away_team" class="admin-in" placeholder="ex: Olympique Lyonnais" required>
         </div>
         <div>
-          <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.25rem;">
-            Date (UTC)
-          </label>
+          <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.25rem;">Date (UTC)</label>
           <input type="date" name="kickoff_date" class="admin-in" required>
         </div>
         <div>
-          <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.25rem;">
-            Heure (UTC)
-          </label>
+          <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.25rem;">Heure (UTC)</label>
           <input type="time" name="kickoff_time" class="admin-in" value="19:00" required>
         </div>
       </div>
