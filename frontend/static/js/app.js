@@ -101,9 +101,9 @@ async function submitEstimation(matchdayId) {
 }
 
 // ── Navigation journée ───────────────────────────────────────
-function goToJournee(select) {
+function goToJournee(select, seasonId) {
   const val = select.value;
-  if (val) window.location.href = `/journee/${val}`;
+  if (val) window.location.href = `/saison/${seasonId}/journee/${val}`;
 }
 
 // ── Admin : importer depuis l'API ─────────────────────────────
