@@ -4,32 +4,69 @@
 {% block content %}
 <div class="container">
   <h1>⚙ Administration</h1>
-  <p style="color:var(--muted); font-size:.85rem; margin-bottom:1.5rem;">{{ season.name }}</p>
 
-  <!-- Actions globales -->
+  <!-- Gestion des saisons -->
   <div class="card" style="margin-bottom:1.5rem;">
-    <h2 style="margin-bottom:.75rem;">Actions globales</h2>
+    <h2 style="margin-bottom:.75rem;">Saisons</h2>
+
+    <table class="admin-table" style="margin-bottom:1rem;">
+      <thead><tr><th>Saison</th><th>Statut</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for s in all_seasons %}
+        <tr>
+          <td><strong>{{ s.name }}</strong></td>
+          <td>
+            {% if s.is_active %}
+              <span class="badge badge-open">Saison active</span>
+            {% else %}
+              <span style="color:var(--muted); font-size:.85rem;">Archivée</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if not s.is_active %}
+            <form method="post" action="/admin/season/set-active"
+                  onsubmit="return confirm('Activer la saison {{ s.name }} ? La saison actuelle sera archivée.')">
+              <input type="hidden" name="season_id" value="{{ s.id }}">
+              <button type="submit" class="btn btn-secondary btn-sm">Activer</button>
+            </form>
+            {% else %}
+            <span style="color:var(--muted); font-size:.8rem;">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Créer une nouvelle saison -->
+    <div style="border-top:1px solid var(--border); padding-top:.85rem; margin-top:.5rem;">
+      <div style="font-size:.8rem; color:var(--muted); margin-bottom:.5rem;">Créer une nouvelle saison :</div>
+      <form method="post" action="/admin/season/create" style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
+        <label style="font-size:.85rem; color:var(--muted);">Année de début :</label>
+        <input type="number" name="year_start" class="admin-in" style="width:5rem;"
+               value="{{ all_seasons[0].year_start + 1 if all_seasons else 2026 }}" min="2020" max="2050" required>
+        <button type="submit" class="btn btn-primary btn-sm">Créer</button>
+        <span style="font-size:.78rem; color:var(--muted);">(ex: 2026 → crée "Ligue 1 2026/2027")</span>
+      </form>
+    </div>
+  </div>
+
+  <!-- Saison active -->
+  {% if season %}
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h2 style="margin-bottom:.75rem;">Actions — {{ season.name }}</h2>
     <div style="display:flex; gap:.75rem; flex-wrap:wrap; align-items:center;">
       <button id="btn_update_scores" class="btn btn-primary" onclick="updateScoresApi()">
         🔄 Mettre à jour les scores (API)
       </button>
-      <span style="font-size:.8rem; color:var(--muted);">
-        Récupère les résultats en temps réel depuis API-Football
-      </span>
+      <span style="font-size:.8rem; color:var(--muted);">Récupère les résultats via API-Football</span>
     </div>
   </div>
 
-  <!-- Liste des journées -->
-  <h2 style="margin-bottom:.75rem;">Journées de Ligue 1</h2>
+  <h2 style="margin-bottom:.75rem;">Journées — {{ season.name }}</h2>
   <div class="card" style="padding:0; overflow:hidden;">
     <table class="admin-table">
-      <thead>
-        <tr>
-          <th>Journée</th>
-          <th>Matchs</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
+      <thead><tr><th>Journée</th><th>Matchs</th><th>Actions</th></tr></thead>
       <tbody>
         {% for md in matchdays %}
         <tr>
@@ -37,12 +74,8 @@
           <td>{{ md.nb_matches }} match{{ 'es' if md.nb_matches != 1 else '' }}</td>
           <td>
             <div style="display:flex; gap:.4rem; flex-wrap:wrap;">
-              <a href="/admin/journee/{{ md.number }}" class="btn btn-secondary btn-sm">
-                Gérer
-              </a>
-              <a href="/journee/{{ md.number }}" class="btn btn-secondary btn-sm">
-                Voir
-              </a>
+              <a href="/admin/journee/{{ md.number }}" class="btn btn-secondary btn-sm">Gérer</a>
+              <a href="/saison/{{ season.id }}/journee/{{ md.number }}" class="btn btn-secondary btn-sm">Voir</a>
             </div>
           </td>
         </tr>
@@ -50,18 +83,13 @@
       </tbody>
     </table>
   </div>
+  {% endif %}
 
-  <!-- Mots de passe -->
   <div class="card" style="margin-top:1.5rem;">
     <h2 style="margin-bottom:.75rem;">Mots de passe initiaux</h2>
-    <p style="font-size:.85rem; color:var(--muted); margin-bottom:.75rem;">
-      Le mot de passe initial de chaque joueur est son prénom en minuscules.
-      Pour <strong>La Dame blanche</strong> → <code style="background:var(--surface2); padding:.1rem .4rem; border-radius:4px;">la dame blanche</code>,
-      pour <strong>Le Doubs</strong> → <code style="background:var(--surface2); padding:.1rem .4rem; border-radius:4px;">le doubs</code>.
-      Le mot de passe admin est <code style="background:var(--surface2); padding:.1rem .4rem; border-radius:4px;">admin123</code> — <strong style="color:var(--accent);">changez-le !</strong>
-    </p>
-    <p style="font-size:.8rem; color:var(--muted);">
-      Pour changer un mot de passe, modifiez directement dans la base SQLite ou ajoutez une route dédiée.
+    <p style="font-size:.85rem; color:var(--muted);">
+      Prénom en minuscules. Admin : <code style="background:var(--surface2); padding:.1rem .4rem; border-radius:4px;">admin123</code>
+      — <strong style="color:var(--accent);">changez-le !</strong>
     </p>
   </div>
 </div>

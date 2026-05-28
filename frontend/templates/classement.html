@@ -1,10 +1,24 @@
 {% extends "base.html" %}
-{% block title %}Classement — L1 Pronostics{% endblock %}
+{% block title %}Classement {{ season.name }} — L1 Pronostics{% endblock %}
 
 {% block content %}
 <div class="container">
+
+  <!-- Sélecteur de saison -->
+  {% if all_seasons|length > 1 %}
+  <div style="display:flex; align-items:center; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap;">
+    <span style="font-size:.8rem; color:var(--muted);">Saison :</span>
+    {% for s in all_seasons %}
+    <a href="/saison/{{ s.id }}/classement"
+       class="btn btn-sm {% if s.id == season.id %}btn-primary{% else %}btn-secondary{% endif %}">
+      {{ s.name }}{% if s.is_active %} ★{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <div class="journee-nav" style="margin-bottom:1rem;">
-    <a href="/" class="btn btn-secondary btn-sm">← Journées</a>
+    <a href="/saison/{{ season.id }}/journee/1" class="btn btn-secondary btn-sm">← Journées</a>
   </div>
 
   <h1>🏆 Classement Général</h1>
@@ -19,10 +33,10 @@
           <th style="width:2.5rem; text-align:center;">#</th>
           <th>Joueur</th>
           <th style="text-align:right;">Pts</th>
-          <th style="text-align:center;" title="Pronostics Justes (2pts)">PJ</th>
-          <th style="text-align:center;" title="Pronostics Parfaits (4pts)">PP</th>
-          <th style="text-align:center;" title="Pronostics Approchants (3pts)">PA</th>
-          <th style="text-align:center;" title="Bonus But (6pts)">BB</th>
+          <th style="text-align:center;" title="Pronostics Justes">PJ</th>
+          <th style="text-align:center;" title="Pronostics Parfaits">PP</th>
+          <th style="text-align:center;" title="Pronostics Approchants">PA</th>
+          <th style="text-align:center;" title="Bonus But">BB</th>
           <th style="text-align:center;" title="Estimations Justes">Est✓</th>
         </tr>
       </thead>
@@ -30,34 +44,21 @@
         {% for p in ranking %}
         <tr class="rank-{{ p.rank }}">
           <td class="rank-num">
-            {% if p.rank == 1 %}🥇
-            {% elif p.rank == 2 %}🥈
-            {% elif p.rank == 3 %}🥉
-            {% else %}{{ p.rank }}{% endif %}
+            {% if p.rank == 1 %}🥇{% elif p.rank == 2 %}🥈{% elif p.rank == 3 %}🥉{% else %}{{ p.rank }}{% endif %}
           </td>
-          <td class="player-cell">
-            {{ p.username }}
-            {% if p.rank == 1 %}<span style="font-size:.7rem; color:var(--accent); margin-left:.3rem">leader</span>{% endif %}
-          </td>
+          <td class="player-cell">{{ p.username }}{% if p.rank == 1 %}<span style="font-size:.7rem; color:var(--accent); margin-left:.3rem">leader</span>{% endif %}</td>
           <td class="pts-cell" style="text-align:right;">{{ p.points }}</td>
           <td style="text-align:center; color:var(--muted);">{{ p.pj }}</td>
           <td style="text-align:center; color:var(--muted);">{{ p.pp }}</td>
           <td style="text-align:center; color:var(--muted);">{{ p.pa }}</td>
-          <td style="text-align:center;">
-            {% if p.bb > 0 %}<span style="color:#9b59b6;">{{ p.bb }}</span>{% else %}—{% endif %}
-          </td>
-          <td style="text-align:center;">
-            {% if p.estimates_ok > 0 %}
-              <span style="color:var(--accent);">{{ p.estimates_ok }}</span>
-            {% else %}—{% endif %}
-          </td>
+          <td style="text-align:center;">{% if p.bb > 0 %}<span style="color:#9b59b6;">{{ p.bb }}</span>{% else %}—{% endif %}</td>
+          <td style="text-align:center;">{% if p.estimates_ok > 0 %}<span style="color:var(--accent);">{{ p.estimates_ok }}</span>{% else %}—{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 
-  <!-- Légende -->
   <div style="margin-top:1.2rem; display:flex; gap:.5rem; flex-wrap:wrap; font-size:.78rem; color:var(--muted);">
     <span class="badge badge-bb">BB = 6 pts</span>
     <span class="badge badge-pp">PP = 4 pts</span>
@@ -66,13 +67,12 @@
     <span style="margin-left:.5rem;">Est✓ = estimations exactes (+2 pts chacune)</span>
   </div>
 
-  <!-- Navigation journées -->
   {% if all_matchdays %}
   <div style="margin-top:2rem;">
     <h2>Voir une journée</h2>
     <div style="display:flex; gap:.4rem; flex-wrap:wrap; margin-top:.5rem;">
       {% for jn in all_matchdays %}
-      <a href="/journee/{{ jn }}" class="btn btn-secondary btn-sm">J{{ jn }}</a>
+      <a href="/saison/{{ season.id }}/journee/{{ jn }}" class="btn btn-secondary btn-sm">J{{ jn }}</a>
       {% endfor %}
     </div>
   </div>

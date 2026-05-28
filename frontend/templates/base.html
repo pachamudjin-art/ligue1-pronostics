@@ -13,8 +13,13 @@
 <nav>
   <a class="nav-brand" href="/">⚽ L1 PRONOSTICS</a>
   <div class="nav-links">
-    <a href="/" {% if request.url.path.startswith('/journee') %}class="active"{% endif %}>Journées</a>
-    <a href="/classement" {% if request.url.path == '/classement' %}class="active"{% endif %}>Classement</a>
+    {% if season %}
+    <a href="/saison/{{ season.id }}/journee/1" {% if request.url.path.startswith('/saison') and '/journee/' in request.url.path %}class="active"{% endif %}>Journées</a>
+    <a href="/saison/{{ season.id }}/classement" {% if '/classement' in request.url.path %}class="active"{% endif %}>Classement</a>
+    {% else %}
+    <a href="/">Journées</a>
+    <a href="/classement">Classement</a>
+    {% endif %}
     <a href="/chat" {% if request.url.path == '/chat' %}class="active"{% endif %}>💬 Vestiaire</a>
     {% if user.is_admin %}
     <a href="/admin" {% if request.url.path.startswith('/admin') %}class="active"{% endif %}>⚙ Admin</a>
