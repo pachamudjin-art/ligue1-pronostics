@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, date
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "pronostics.db")
 
@@ -14,7 +14,6 @@ def get_db():
 def init_db():
     conn = get_db()
     c = conn.cursor()
-
     c.executescript("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,74 +86,81 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     );
     """)
-
     conn.commit()
     conn.close()
     print("Base de données initialisée.")
 
-def seed_users():
-    """Crée les 9 participants + admin s'ils n'existent pas."""
-    import hashlib
+def get_current_season_years():
+    """Détermine la saison en cours selon la date : du 1er juillet N au 30 juin N+1."""
+    today = date.today()
+    if today.month >= 7:
+        return today.year, today.year + 1
+    else:
+        return today.year - 1, today.year
+
+def ensure_season_exists(year_start, year_end):
+    """Crée la saison si elle n'existe pas encore. Retourne son id."""
     conn = get_db()
     c = conn.cursor()
-
-    participants = [
-        "Malherbe", "Ben", "Seb", "Coach", "Ricardo",
-        "Dreux", "Mathieu", "La Dame blanche", "Le Doubs"
-    ]
-
-    for name in participants:
-        pwd = hashlib.sha256(name.lower().encode()).hexdigest()
-        try:
-            c.execute(
-                "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 0)",
-                (name, pwd)
-            )
-        except sqlite3.IntegrityError:
-            pass
-
-    # Admin : username=admin, password=admin123 (à changer !)
-    admin_pwd = hashlib.sha256("admin123".encode()).hexdigest()
-    try:
-        c.execute(
-            "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)",
-            ("admin", admin_pwd)
-        )
-    except sqlite3.IntegrityError:
-        pass
-
-    conn.commit()
-    conn.close()
-    print("Utilisateurs créés.")
-
-def seed_season_2025_2026():
-    """Crée la saison 2025/2026 pour les tests."""
-    conn = get_db()
-    c = conn.cursor()
-
-    existing = c.execute("SELECT id FROM seasons WHERE year_start=2025").fetchone()
+    existing = c.execute("SELECT id FROM seasons WHERE year_start=?", (year_start,)).fetchone()
     if existing:
         conn.close()
         return existing["id"]
-
+    name = f"Ligue 1 {year_start}/{year_end}"
     c.execute(
-        "INSERT INTO seasons (name, year_start, year_end, is_active) VALUES (?, ?, ?, 1)",
-        ("Ligue 1 2025/2026", 2025, 2026)
+        "INSERT INTO seasons (name, year_start, year_end, is_active) VALUES (?, ?, ?, 0)",
+        (name, year_start, year_end)
     )
     season_id = c.lastrowid
-
     for i in range(1, 35):
         c.execute(
             "INSERT INTO matchdays (season_id, number, label) VALUES (?, ?, ?)",
             (season_id, i, f"Journée {i}")
         )
-
     conn.commit()
     conn.close()
-    print(f"Saison 2025/2026 créée (id={season_id}).")
+    print(f"Saison {name} créée (id={season_id}).")
     return season_id
+
+def seed_users():
+    import hashlib
+    conn = get_db()
+    c = conn.cursor()
+    participants = [
+        "Malherbe", "Ben", "Seb", "Coach", "Ricardo",
+        "Dreux", "Mathieu", "La Dame blanche", "Le Doubs"
+    ]
+    for name in participants:
+        pwd = hashlib.sha256(name.lower().encode()).hexdigest()
+        try:
+            c.execute("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 0)", (name, pwd))
+        except sqlite3.IntegrityError:
+            pass
+    admin_pwd = hashlib.sha256("admin123".encode()).hexdigest()
+    try:
+        c.execute("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)", ("admin", admin_pwd))
+    except sqlite3.IntegrityError:
+        pass
+    conn.commit()
+    conn.close()
+    print("Utilisateurs créés.")
+
+def seed_active_season():
+    """Crée la saison courante et la marque active si aucune saison active n'existe."""
+    conn = get_db()
+    active = conn.execute("SELECT id FROM seasons WHERE is_active=1").fetchone()
+    conn.close()
+    if active:
+        return
+    year_start, year_end = get_current_season_years()
+    season_id = ensure_season_exists(year_start, year_end)
+    conn = get_db()
+    conn.execute("UPDATE seasons SET is_active=1 WHERE id=?", (season_id,))
+    conn.commit()
+    conn.close()
+    print(f"Saison {year_start}/{year_end} activée.")
 
 if __name__ == "__main__":
     init_db()
     seed_users()
-    seed_season_2025_2026()
+    seed_active_season()
