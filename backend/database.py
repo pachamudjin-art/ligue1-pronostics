@@ -18,15 +18,10 @@ def get_pg_url():
 def init_pool():
     global _pool
     if _pool is None:
-        _pool = psycopg2.pool.ThreadedConnectionPool(
-            minconn=1,
-            maxconn=10,
-            dsn=get_pg_url()
-        )
+        _pool = psycopg2.pool.ThreadedConnectionPool(minconn=1, maxconn=10, dsn=get_pg_url())
         print("Pool de connexions initialisé.")
 
 def get_db():
-    """Retourne une connexion depuis le pool."""
     global _pool
     if _pool is None:
         init_pool()
@@ -36,24 +31,18 @@ def get_db():
     return conn
 
 def release_db(conn):
-    """Remet la connexion dans le pool."""
     global _pool
     if _pool and conn:
-        try:
-            _pool.putconn(conn)
-        except Exception:
-            pass
+        try: _pool.putconn(conn)
+        except: pass
 
 def q(conn, sql, params=None):
     c = conn.cursor()
     c.execute(sql, params or ())
     return c
 
-def qone(conn, sql, params=None):
-    return q(conn, sql, params).fetchone()
-
-def qall(conn, sql, params=None):
-    return q(conn, sql, params).fetchall()
+def qone(conn, sql, params=None): return q(conn, sql, params).fetchone()
+def qall(conn, sql, params=None): return q(conn, sql, params).fetchall()
 
 get_db_conn = get_db
 
@@ -69,7 +58,9 @@ def init_db():
         """CREATE TABLE IF NOT EXISTS seasons (
             id SERIAL PRIMARY KEY, name TEXT NOT NULL,
             year_start INTEGER NOT NULL, year_end INTEGER NOT NULL,
-            is_active INTEGER DEFAULT 0)""",
+            is_active INTEGER DEFAULT 0,
+            competition_type TEXT DEFAULT 'league',
+            api_code TEXT DEFAULT 'FL1')""",
         """CREATE TABLE IF NOT EXISTS matchdays (
             id SERIAL PRIMARY KEY, season_id INTEGER NOT NULL REFERENCES seasons(id),
             number INTEGER NOT NULL, label TEXT, UNIQUE(season_id, number))""",
@@ -99,14 +90,37 @@ def init_db():
             user_id INTEGER NOT NULL REFERENCES users(id),
             message TEXT NOT NULL,
             created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
+        # Table pronostics podium (Coupe du Monde etc.)
+        """CREATE TABLE IF NOT EXISTS podium_pronostics (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            season_id INTEGER NOT NULL REFERENCES seasons(id),
+            rank1 TEXT NOT NULL,
+            rank2 TEXT NOT NULL,
+            rank3 TEXT NOT NULL,
+            created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'),
+            updated_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'),
+            UNIQUE(user_id, season_id))""",
+        # Table résultat podium réel
+        """CREATE TABLE IF NOT EXISTS podium_results (
+            id SERIAL PRIMARY KEY,
+            season_id INTEGER NOT NULL REFERENCES seasons(id) UNIQUE,
+            rank1 TEXT NOT NULL,
+            rank2 TEXT NOT NULL,
+            rank3 TEXT NOT NULL,
+            created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
     ]
     for stmt in stmts:
         c.execute(stmt)
-    # Migration : ajouter colonne theme si elle n'existe pas
-    try:
-        c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'ligue1'")
-    except Exception:
-        pass
+    # Migrations colonnes existantes
+    migrations = [
+        "ALTER TABLE seasons ADD COLUMN IF NOT EXISTS competition_type TEXT DEFAULT 'league'",
+        "ALTER TABLE seasons ADD COLUMN IF NOT EXISTS api_code TEXT DEFAULT 'FL1'",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'ligue1'",
+    ]
+    for m in migrations:
+        try: c.execute(m)
+        except: pass
     conn.commit()
     release_db(conn)
     print("Base de données initialisée.")
@@ -117,23 +131,24 @@ def get_current_season_years():
         return today.year, today.year + 1
     return today.year - 1, today.year
 
-def ensure_season_exists(year_start, year_end):
+def ensure_season_exists(year_start, year_end, name=None, competition_type='league', api_code='FL1', nb_journees=34):
     conn = get_db()
-    existing = qone(conn, "SELECT id FROM seasons WHERE year_start=%s", (year_start,))
+    existing = qone(conn, "SELECT id FROM seasons WHERE year_start=%s AND competition_type=%s", (year_start, competition_type))
     if existing:
         release_db(conn)
         return existing["id"]
-    name = f"Ligue 1 {year_start}/{year_end}"
+    if not name:
+        name = f"Ligue 1 {year_start}/{year_end}"
     c = conn.cursor()
-    c.execute("INSERT INTO seasons (name,year_start,year_end,is_active) VALUES (%s,%s,%s,0) RETURNING id",
-              (name, year_start, year_end))
+    c.execute("INSERT INTO seasons (name,year_start,year_end,is_active,competition_type,api_code) VALUES (%s,%s,%s,0,%s,%s) RETURNING id",
+              (name, year_start, year_end, competition_type, api_code))
     season_id = c.fetchone()["id"]
-    for i in range(1, 35):
+    for i in range(1, nb_journees + 1):
         c.execute("INSERT INTO matchdays (season_id,number,label) VALUES (%s,%s,%s)",
                   (season_id, i, f"Journée {i}"))
     conn.commit()
     release_db(conn)
-    print(f"Saison {name} créée.")
+    print(f"Compétition {name} créée (id={season_id}).")
     return season_id
 
 def seed_users():

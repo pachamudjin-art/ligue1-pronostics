@@ -16,7 +16,8 @@ from database import (get_db, release_db, init_db, seed_users, seed_active_seaso
                       q, qone, qall)
 from scoring import (compute_points, compute_estimate_points,
                      compute_matchday_stats, compute_general_ranking)
-from api_football import import_matchday_to_db, update_live_scores, fetch_fixtures
+from api_football import import_matchday_to_db, update_live_scores, fetch_fixtures, fetch_teams
+from scoring import compute_podium_points
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
@@ -96,6 +97,8 @@ def get_all_seasons():
 def compute_ranking_for_season(season_id, conn):
     users = qall(conn, "SELECT * FROM users WHERE is_admin=0")
     matchdays = qall(conn, "SELECT id FROM matchdays WHERE season_id=%s", (season_id,))
+    # Résultat podium réel (si existe)
+    podium_result = qone(conn, "SELECT * FROM podium_results WHERE season_id=%s", (season_id,))
     players_data = []
     for u in users:
         rows = qall(conn, """
@@ -108,6 +111,17 @@ def compute_ranking_for_season(season_id, conn):
               AND m.home_score IS NOT NULL AND m.away_score IS NOT NULL
         """, (u["id"], season_id))
         stats = compute_matchday_stats([dict(r) for r in rows])
+        # Points podium
+        podium_pts = 0
+        if podium_result:
+            my_podium = qone(conn, "SELECT * FROM podium_pronostics WHERE user_id=%s AND season_id=%s",
+                            (u["id"], season_id))
+            if my_podium:
+                pp = compute_podium_points(
+                    podium_result["rank1"], podium_result["rank2"], podium_result["rank3"],
+                    my_podium["rank1"], my_podium["rank2"], my_podium["rank3"]
+                )
+                podium_pts = pp["points"]
         estimates_ok = 0
         for md in matchdays:
             est = qone(conn, "SELECT estimated_score FROM score_estimates WHERE user_id=%s AND matchday_id=%s",
@@ -130,9 +144,10 @@ def compute_ranking_for_season(season_id, conn):
                     estimates_ok += 1
         players_data.append({
             "user_id": u["id"], "username": u["username"],
-            "points": stats["points"] + (estimates_ok * 2),
+            "points": stats["points"] + (estimates_ok * 2) + podium_pts,
             "pj": stats["pj"], "pp": stats["pp"], "pa": stats["pa"],
             "bb": stats["bb"], "estimates_ok": estimates_ok,
+            "podium_pts": podium_pts,
         })
     return compute_general_ranking(players_data)
 
@@ -463,6 +478,125 @@ async def submit_estimation(request: Request, matchday_id: int = Form(...),
     return JSONResponse({"ok": True})
 
 
+# ─── Pronostic Podium ────────────────────────────────────────────────────────
+
+@app.post("/podium/submit")
+async def submit_podium(request: Request, season_id: int = Form(...),
+                        rank1: str = Form(...), rank2: str = Form(...), rank3: str = Form(...)):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"ok": False, "error": "Non connecté"}, status_code=401)
+    conn = get_db()
+    season = qone(conn, "SELECT * FROM seasons WHERE id=%s", (season_id,))
+    if not season or not season.get("is_active"):
+        release_db(conn)
+        return JSONResponse({"ok": False, "error": "Compétition non active"}, status_code=403)
+    # Vérifier que le 1er match n'a pas encore commencé
+    first_match = qone(conn, """
+        SELECT m.kickoff_time FROM matches m
+        JOIN matchdays md ON md.id=m.matchday_id
+        WHERE md.season_id=%s ORDER BY m.kickoff_time LIMIT 1
+    """, (season_id,))
+    if first_match:
+        first_ko = parse_kickoff(first_match["kickoff_time"])
+        if datetime.now(timezone.utc) >= first_ko:
+            release_db(conn)
+            return JSONResponse({"ok": False, "error": "Pronostic podium verrouillé"}, status_code=403)
+    now = utcnow_str()
+    q(conn, """
+        INSERT INTO podium_pronostics (user_id, season_id, rank1, rank2, rank3)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT(user_id, season_id) DO UPDATE SET
+            rank1=EXCLUDED.rank1, rank2=EXCLUDED.rank2, rank3=EXCLUDED.rank3, updated_at=%s
+    """, (user["id"], season_id, rank1.strip(), rank2.strip(), rank3.strip(), now))
+    conn.commit()
+    release_db(conn)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/saison/{season_id}/podium", response_class=HTMLResponse)
+async def podium_page(request: Request, season_id: int):
+    user = get_current_user(request)
+    if not user: return RedirectResponse("/login", status_code=303)
+    season = get_season_by_id(season_id)
+    if not season:
+        return templates.TemplateResponse("error.html", {"request": request, "message": "Compétition introuvable."})
+
+    conn = get_db()
+    # Pronostics podium de tous les joueurs
+    all_pronos = qall(conn, """
+        SELECT pp.*, u.username FROM podium_pronostics pp
+        JOIN users u ON u.id=pp.user_id WHERE pp.season_id=%s
+    """, (season_id,))
+
+    # Résultat podium réel
+    podium_result = qone(conn, "SELECT * FROM podium_results WHERE season_id=%s", (season_id,))
+
+    # Mon pronostic
+    my_prono = qone(conn, "SELECT * FROM podium_pronostics WHERE user_id=%s AND season_id=%s",
+                    (user["id"], season_id))
+
+    # Premier match de la compétition (pour verrouillage)
+    first_match = qone(conn, """
+        SELECT m.kickoff_time FROM matches m
+        JOIN matchdays md ON md.id=m.matchday_id
+        WHERE md.season_id=%s ORDER BY m.kickoff_time LIMIT 1
+    """, (season_id,))
+    locked = False
+    if first_match:
+        locked = datetime.now(timezone.utc) >= parse_kickoff(first_match["kickoff_time"])
+
+    # Équipes disponibles depuis l'API (ou liste vide si pas dispo)
+    teams = []
+    if not locked:
+        try:
+            teams = fetch_teams(season.get("api_code", "FL1"), season["year_start"])
+        except:
+            pass
+
+    # Calcul des points podium si résultat connu
+    podium_scores = []
+    if podium_result:
+        for p in all_pronos:
+            pts = compute_podium_points(
+                podium_result["rank1"], podium_result["rank2"], podium_result["rank3"],
+                p["rank1"], p["rank2"], p["rank3"]
+            )
+            podium_scores.append({"username": p["username"], **pts})
+        podium_scores.sort(key=lambda x: -x["points"])
+
+    active_season = get_active_season()
+    all_seasons = get_all_seasons()
+    release_db(conn)
+
+    return templates.TemplateResponse("podium.html", {
+        "request": request, "user": user,
+        "season": season, "all_seasons": all_seasons,
+        "active_season_id": active_season["id"] if active_season else None,
+        "all_pronos": [dict(p) for p in all_pronos],
+        "my_prono": dict(my_prono) if my_prono else None,
+        "podium_result": dict(podium_result) if podium_result else None,
+        "podium_scores": podium_scores,
+        "locked": locked,
+        "teams": sorted(teams),
+    })
+
+
+@app.post("/admin/podium/set-result")
+async def admin_set_podium_result(request: Request, season_id: int = Form(...),
+                                   rank1: str = Form(...), rank2: str = Form(...), rank3: str = Form(...)):
+    require_admin(request)
+    conn = get_db()
+    q(conn, """
+        INSERT INTO podium_results (season_id, rank1, rank2, rank3)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT(season_id) DO UPDATE SET rank1=EXCLUDED.rank1, rank2=EXCLUDED.rank2, rank3=EXCLUDED.rank3
+    """, (season_id, rank1.strip(), rank2.strip(), rank3.strip()))
+    conn.commit()
+    release_db(conn)
+    return RedirectResponse(f"/saison/{season_id}/podium", status_code=303)
+
+
 # ─── Classement ──────────────────────────────────────────────────────────────
 
 @app.get("/classement", response_class=HTMLResponse)
@@ -530,9 +664,20 @@ async def admin_set_active_season(request: Request, season_id: int = Form(...)):
     return RedirectResponse("/admin", status_code=303)
 
 @app.post("/admin/season/create")
-async def admin_create_season(request: Request, year_start: int = Form(...)):
+async def admin_create_season(
+    request: Request,
+    year_start: int = Form(...),
+    competition_name: str = Form(""),
+    competition_type: str = Form("league"),
+    api_code: str = Form("FL1"),
+    nb_journees: int = Form(34),
+):
     require_admin(request)
-    ensure_season_exists(year_start, year_start + 1)
+    name = competition_name.strip() if competition_name.strip() else None
+    ensure_season_exists(year_start, year_start + 1, name=name,
+                         competition_type=competition_type,
+                         api_code=api_code,
+                         nb_journees=nb_journees)
     return RedirectResponse("/admin", status_code=303)
 
 @app.get("/admin/journee/{number}", response_class=HTMLResponse)
@@ -608,7 +753,8 @@ async def admin_import_api(request: Request, matchday_number: int = Form(...),
     if not matchday:
         release_db(conn)
         return JSONResponse({"ok": False, "error": f"Journée {matchday_number} introuvable"})
-    nb, errors = import_matchday_to_db(year_to_use, matchday_number, season["id"], matchday["id"], conn)
+    api_code = season.get("api_code", "FL1")
+    nb, errors = import_matchday_to_db(year_to_use, matchday_number, season["id"], matchday["id"], conn, competition_code=api_code)
     release_db(conn)
     return JSONResponse({"ok": True, "imported": nb, "errors": errors})
 
@@ -618,7 +764,8 @@ async def admin_import_saison_complete(request: Request):
     season = get_active_season()
     conn = get_db()
     year_to_use = season["year_start"]
-    all_fixtures = fetch_fixtures(year_to_use)
+    api_code = season.get("api_code", "FL1")
+    all_fixtures = fetch_fixtures(year_to_use, competition_code=api_code)
     if not all_fixtures:
         release_db(conn)
         return JSONResponse({"ok": False, "error": "Aucun match récupéré depuis l'API."})
