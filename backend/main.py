@@ -554,26 +554,62 @@ async def admin_import_saison_complete(request: Request):
         (season["id"],)
     ).fetchall()
 
-    for md in matchdays:
-        nb, errors = import_matchday_to_db(
-            year_to_use, md["number"], season["id"], md["id"], conn
-        )
-        if nb > 0:
-            total_imported += nb
-            journees_ok.append(md["number"])
-        if errors:
-            total_errors.extend([f"J{md['number']}: {e}" for e in errors])
-        if nb == 0 and not errors:
-            journees_vides.append(md["number"])
+    # Une seule requête pour toute la saison — évite le rate limit
+    from api_football import fetch_fixtures
+    import sqlite3
 
+    all_fixtures = fetch_fixtures(year_to_use)
+    if not all_fixtures:
+        conn.close()
+        return JSONResponse({"ok": False, "error": "Aucun match récupéré depuis l'API. Vérifiez FOOTBALL_DATA_KEY."})
+
+    # Indexer les journées par numéro
+    matchdays_by_number = {md["number"]: md for md in matchdays}
+
+    c = conn.cursor()
+    total_errors = []
+
+    for f in all_fixtures:
+        jn = f.get("matchday_number")
+        if not jn or jn not in matchdays_by_number:
+            continue
+        md = matchdays_by_number[jn]
+        try:
+            existing = c.execute(
+                "SELECT id FROM matches WHERE external_id=?", (f["external_id"],)
+            ).fetchone()
+            if existing:
+                c.execute("""
+                    UPDATE matches SET home_team=?, away_team=?, kickoff_time=?,
+                        home_score=?, away_score=?, status=? WHERE id=?
+                """, (f["home_team"], f["away_team"], f["kickoff_time"],
+                      f["home_score"], f["away_score"], f["status"], existing["id"]))
+            else:
+                c.execute("""
+                    INSERT INTO matches (matchday_id, home_team, away_team, kickoff_time,
+                        home_score, away_score, status, external_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (md["id"], f["home_team"], f["away_team"], f["kickoff_time"],
+                      f["home_score"], f["away_score"], f["status"], f["external_id"]))
+                total_imported += 1
+                if jn not in journees_ok:
+                    journees_ok.append(jn)
+        except Exception as e:
+            total_errors.append(f"J{jn}: {str(e)}")
+
+    conn.commit()
     conn.close()
-    print(f"[IMPORT COMPLET] {total_imported} matchs importés sur {len(matchdays)} journées")
+
+    # Journées sans aucun match importé
+    journees_vides = [md["number"] for md in matchdays if md["number"] not in journees_ok]
+
+    print(f"[IMPORT COMPLET] {total_imported} matchs importés, {len(journees_ok)} journées remplies")
     return JSONResponse({
         "ok": True,
         "total_imported": total_imported,
-        "journees_importees": journees_ok,
-        "journees_vides": journees_vides,
-        "errors": total_errors[:10]  # max 10 erreurs affichées
+        "journees_importees": sorted(journees_ok),
+        "journees_vides": sorted(journees_vides),
+        "errors": total_errors[:10]
     })
 
 
