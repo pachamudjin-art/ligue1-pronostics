@@ -144,7 +144,11 @@ async def login(request: Request, username: str = Form(...), password: str = For
     user = qone(conn, "SELECT * FROM users WHERE username=%s", (username,))
     release_db(conn)
     if user and user["password_hash"] == hash_password(password):
-        request.session["user"] = {"id": user["id"], "username": user["username"], "is_admin": bool(user["is_admin"])}
+        request.session["user"] = {
+            "id": user["id"], "username": user["username"],
+            "is_admin": bool(user["is_admin"]),
+            "theme": user.get("theme") or "ligue1"
+        }
         return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse("login.html", {"request": request, "error": "Identifiants incorrects"})
 
@@ -162,6 +166,23 @@ async def profil_page(request: Request):
     if not user: return RedirectResponse("/login", status_code=303)
     season = get_active_season()
     return templates.TemplateResponse("profil.html", {"request": request, "user": user, "season": season})
+
+@app.post("/profil/change-theme")
+async def change_theme(request: Request, theme: str = Form(...)):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    valid_themes = ["ligue1", "nuit-bleue", "rouge-passion", "neon", "minimaliste", "glassmorphism"]
+    if theme not in valid_themes:
+        theme = "ligue1"
+    conn = get_db()
+    q(conn, "UPDATE users SET theme=%s WHERE id=%s", (theme, user["id"]))
+    conn.commit()
+    release_db(conn)
+    # Mettre à jour la session
+    request.session["user"]["theme"] = theme
+    return RedirectResponse("/profil", status_code=303)
+
 
 @app.post("/profil/change-password")
 async def change_password(request: Request, current_password: str = Form(...),

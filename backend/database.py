@@ -64,6 +64,7 @@ def init_db():
         """CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL, is_admin INTEGER DEFAULT 0,
+            theme TEXT DEFAULT 'ligue1',
             created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
         """CREATE TABLE IF NOT EXISTS seasons (
             id SERIAL PRIMARY KEY, name TEXT NOT NULL,
@@ -101,6 +102,11 @@ def init_db():
     ]
     for stmt in stmts:
         c.execute(stmt)
+    # Migration : ajouter colonne theme si elle n'existe pas
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'ligue1'")
+    except Exception:
+        pass
     conn.commit()
     release_db(conn)
     print("Base de données initialisée.")
