@@ -528,3 +528,25 @@ async function importSaisonComplete() {
 
   if (btn) { btn.disabled = false; btn.textContent = "📥 Importer toute la saison (API)"; }
 }
+
+
+// ── Import pronostics LibreOffice ─────────────────────────────
+async function importOds() {
+  if (!confirm("Importer tous les pronostics du tableau LibreOffice 2025/2026 ?\nCela peut prendre 30 secondes.")) return;
+  const btn = document.getElementById("btn_import_ods");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Import en cours…"; }
+  toast("Import des pronostics LibreOffice…", "ok", 30000);
+  try {
+    const res = await fetch("/admin/import-ods", { method: "POST" });
+    const data = await res.json();
+    if (data.ok) {
+      toast(`✓ ${data.pronos} pronostics + ${data.estimations} estimations importés`, "ok", 6000);
+      if (data.errors && data.errors.length) toast("Erreurs: " + data.errors[0], "err", 5000);
+    } else {
+      toast("Erreur: " + (data.error || "inconnue"), "err");
+    }
+  } catch(e) {
+    toast("Erreur réseau: " + e.message, "err");
+  }
+  if (btn) { btn.disabled = false; btn.textContent = "📋 Importer pronostics LibreOffice"; }
+}
