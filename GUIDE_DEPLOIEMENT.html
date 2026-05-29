@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guide déploiement — L1 Pronostics</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap');
+  :root {
+    --bg:#0d1117; --surface:#161b22; --surface2:#21262d; --border:#30363d;
+    --accent:#e8c45a; --text:#e6edf3; --muted:#8b949e; --green:#2ea043;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); padding:2rem 1rem 4rem; }
+  .wrap { max-width:720px; margin:0 auto; }
+  h1 { font-family:'Bebas Neue',sans-serif; font-size:2.2rem; color:var(--accent); letter-spacing:.06em; margin-bottom:.3rem; }
+  h2 { font-family:'Bebas Neue',sans-serif; font-size:1.3rem; color:var(--text); letter-spacing:.05em; margin:2rem 0 .75rem; }
+  p, li { font-size:.95rem; line-height:1.65; color:#c9d1d9; }
+  ul, ol { padding-left:1.4rem; }
+  li { margin-bottom:.4rem; }
+  .step {
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:1.2rem 1.4rem; margin-bottom:1rem; position:relative;
+  }
+  .step-num {
+    font-family:'Bebas Neue',sans-serif; font-size:2.5rem; color:var(--accent);
+    opacity:.15; position:absolute; top:.5rem; right:1rem; line-height:1;
+  }
+  .step h3 { font-size:1rem; font-weight:600; margin-bottom:.6rem; color:var(--text); }
+  code {
+    background:var(--surface2); border:1px solid var(--border); border-radius:5px;
+    padding:.15rem .45rem; font-family:monospace; font-size:.88rem; color:var(--accent);
+  }
+  .code-block {
+    background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+    padding:.9rem 1rem; margin:.5rem 0; font-family:monospace; font-size:.85rem;
+    color:#79c0ff; white-space:pre; overflow-x:auto;
+  }
+  .note {
+    background:rgba(232,196,90,.08); border:1px solid rgba(232,196,90,.2);
+    border-radius:8px; padding:.75rem 1rem; margin:.75rem 0; font-size:.88rem; color:var(--muted);
+  }
+  .warn {
+    background:rgba(192,57,43,.1); border:1px solid rgba(192,57,43,.25);
+    border-radius:8px; padding:.75rem 1rem; margin:.75rem 0; font-size:.88rem; color:#e74c3c;
+  }
+  a { color:var(--accent); }
+  .badge { display:inline-block; background:var(--green); color:#fff; border-radius:4px; padding:.1rem .5rem; font-size:.75rem; font-weight:600; }
+  table { width:100%; border-collapse:collapse; margin:.75rem 0; font-size:.88rem; }
+  th { background:var(--surface2); padding:.5rem .75rem; text-align:left; color:var(--muted); font-size:.75rem; text-transform:uppercase; border-bottom:1px solid var(--border); }
+  td { padding:.55rem .75rem; border-bottom:1px solid var(--border); }
+  .divider { border:none; border-top:1px solid var(--border); margin:2rem 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>⚽ Guide de déploiement</h1>
+  <p style="color:var(--muted); margin-bottom:2rem;">L1 Pronostics — Sans ligne de commande, depuis votre navigateur</p>
+
+  <div class="note">
+    ⏱ Temps estimé : <strong>15 minutes</strong> — Aucune installation requise sur votre PC.
+    Tout se fait depuis le navigateur. L'hébergement est <strong>gratuit</strong> sur Railway.
+  </div>
+
+  <!-- ÉTAPE 1 -->
+  <h2>Étape 1 — Créer un compte GitHub</h2>
+  <div class="step">
+    <div class="step-num">1</div>
+    <h3>GitHub stockera votre code en ligne</h3>
+    <ol>
+      <li>Allez sur <a href="https://github.com" target="_blank">github.com</a></li>
+      <li>Cliquez <strong>Sign up</strong> et créez un compte (gratuit)</li>
+      <li>Vérifiez votre email</li>
+    </ol>
+    <div class="note">Si vous avez déjà un compte GitHub, passez à l'étape 2.</div>
+  </div>
+
+  <!-- ÉTAPE 2 -->
+  <h2>Étape 2 — Créer un dépôt GitHub</h2>
+  <div class="step">
+    <div class="step-num">2</div>
+    <h3>Créer le dépôt qui contiendra le code</h3>
+    <ol>
+      <li>Une fois connecté à GitHub, cliquez le <strong>+</strong> en haut à droite → <strong>New repository</strong></li>
+      <li>Nom du dépôt : <code>ligue1-pronostics</code></li>
+      <li>Laissez tout le reste par défaut, cliquez <strong>Create repository</strong></li>
+    </ol>
+  </div>
+
+  <!-- ÉTAPE 3 -->
+  <h2>Étape 3 — Uploader le code</h2>
+  <div class="step">
+    <div class="step-num">3</div>
+    <h3>Envoyer les fichiers sur GitHub depuis le navigateur</h3>
+    <ol>
+      <li>Dans votre nouveau dépôt vide, cliquez <strong>uploading an existing file</strong> (lien bleu au centre)</li>
+      <li><strong>Décompressez</strong> d'abord l'archive <code>ligue1-pronostics.zip</code> sur votre bureau</li>
+      <li>Ouvrez le dossier décompressé. Vous devez voir : <code>backend/</code>, <code>frontend/</code>, <code>requirements.txt</code>, <code>Procfile</code>, <code>README.md</code></li>
+      <li>Sélectionnez <strong>tous ces fichiers et dossiers</strong> et glissez-les dans la zone d'upload GitHub</li>
+      <li>En bas, cliquez <strong>Commit changes</strong></li>
+    </ol>
+    <div class="warn">
+      ⚠️ Attention : uploadez le <em>contenu</em> du dossier (pas le dossier lui-même).
+      Votre dépôt doit voir <code>backend/</code> à la racine, pas <code>ligue1-pronostics/backend/</code>.
+    </div>
+  </div>
+
+  <!-- ÉTAPE 4 -->
+  <h2>Étape 4 — Créer un compte Railway</h2>
+  <div class="step">
+    <div class="step-num">4</div>
+    <h3>Railway hébergera votre application</h3>
+    <ol>
+      <li>Allez sur <a href="https://railway.app" target="_blank">railway.app</a></li>
+      <li>Cliquez <strong>Login</strong> → <strong>Login with GitHub</strong></li>
+      <li>Autorisez Railway à accéder à votre GitHub</li>
+    </ol>
+    <div class="note">Railway propose un plan gratuit (500h/mois, largement suffisant pour 9 joueurs).</div>
+  </div>
+
+  <!-- ÉTAPE 5 -->
+  <h2>Étape 5 — Déployer sur Railway</h2>
+  <div class="step">
+    <div class="step-num">5</div>
+    <h3>Connecter votre dépôt GitHub à Railway</h3>
+    <ol>
+      <li>Dans Railway, cliquez <strong>New Project</strong></li>
+      <li>Choisissez <strong>Deploy from GitHub repo</strong></li>
+      <li>Sélectionnez votre dépôt <code>ligue1-pronostics</code></li>
+      <li>Railway détecte automatiquement le <code>Procfile</code> et lance le déploiement</li>
+      <li>Attendez 1-2 minutes que le déploiement se termine (barre verte = ok)</li>
+    </ol>
+  </div>
+
+  <!-- ÉTAPE 6 -->
+  <h2>Étape 6 — Configurer les variables d'environnement</h2>
+  <div class="step">
+    <div class="step-num">6</div>
+    <h3>Ajouter les variables secrètes</h3>
+    <ol>
+      <li>Dans votre projet Railway, cliquez sur votre service → onglet <strong>Variables</strong></li>
+      <li>Ajoutez ces deux variables en cliquant <strong>+ New Variable</strong> :</li>
+    </ol>
+    <table>
+      <thead><tr><th>Variable</th><th>Valeur</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>SECRET_KEY</code></td>
+          <td>Une phrase longue au hasard, ex : <code>football2025ligue1pronostics</code></td>
+        </tr>
+        <tr>
+          <td><code>API_FOOTBALL_KEY</code></td>
+          <td>Votre clé API-Football (optionnel — voir ci-dessous)</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note">
+      Sans <code>API_FOOTBALL_KEY</code>, l'import automatique du calendrier sera désactivé.
+      Vous pourrez saisir les matchs manuellement depuis l'interface Admin.
+    </div>
+  </div>
+
+  <!-- ÉTAPE 7 -->
+  <h2>Étape 7 — Récupérer l'URL de votre site</h2>
+  <div class="step">
+    <div class="step-num">7</div>
+    <h3>Obtenir le lien à partager à vos amis</h3>
+    <ol>
+      <li>Dans Railway, onglet <strong>Settings</strong> → section <strong>Domains</strong></li>
+      <li>Cliquez <strong>Generate Domain</strong></li>
+      <li>Vous obtenez une URL du type <code>ligue1-pronostics-production.up.railway.app</code></li>
+      <li>Partagez cette URL avec les 9 participants !</li>
+    </ol>
+    <div class="note">🎉 Votre site est en ligne. La base de données se crée automatiquement au premier accès.</div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- Clé API Football -->
+  <h2>Optionnel — Clé API-Football (calendrier automatique)</h2>
+  <div class="step">
+    <h3>Importer le calendrier automatiquement</h3>
+    <ol>
+      <li>Allez sur <a href="https://dashboard.api-football.com/register" target="_blank">api-football.com → Register</a></li>
+      <li>Créez un compte gratuit (100 requêtes/jour)</li>
+      <li>Dans votre dashboard, copiez votre <strong>API Key</strong></li>
+      <li>Collez-la dans Railway comme variable <code>API_FOOTBALL_KEY</code></li>
+      <li>Dans votre site, allez <strong>Admin → Journée X → Importer depuis l'API</strong></li>
+    </ol>
+    <div class="note">Sans cette clé, saisissez simplement les matchs à la main depuis l'Admin. C'est rapide (9 matchs par journée).</div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- Mots de passe -->
+  <h2>Connexion des joueurs</h2>
+  <table>
+    <thead><tr><th>Joueur</th><th>Mot de passe initial</th></tr></thead>
+    <tbody>
+      <tr><td>Malherbe</td><td><code>malherbe</code></td></tr>
+      <tr><td>Ben</td><td><code>ben</code></td></tr>
+      <tr><td>Seb</td><td><code>seb</code></td></tr>
+      <tr><td>Coach</td><td><code>coach</code></td></tr>
+      <tr><td>Ricardo</td><td><code>ricardo</code></td></tr>
+      <tr><td>Dreux</td><td><code>dreux</code></td></tr>
+      <tr><td>Mathieu</td><td><code>mathieu</code></td></tr>
+      <tr><td>La Dame blanche</td><td><code>la dame blanche</code></td></tr>
+      <tr><td>Le Doubs</td><td><code>le doubs</code></td></tr>
+      <tr><td><strong>admin</strong></td><td><code>admin123</code> ← <strong>changez-le !</strong></td></tr>
+    </tbody>
+  </table>
+
+  <div class="warn" style="margin-top:1rem;">
+    Pour changer le mot de passe admin, contactez-moi et je vous fournirai la procédure (une commande Python à lancer une seule fois).
+  </div>
+
+  <hr class="divider">
+
+  <h2>En cas de problème</h2>
+  <div class="step">
+    <h3>Vérifications rapides</h3>
+    <ul>
+      <li><strong>Site inaccessible</strong> : vérifiez que le déploiement Railway est vert (pas rouge)</li>
+      <li><strong>Erreur 500</strong> : dans Railway → onglet <strong>Deployments</strong> → cliquez le dernier déploiement → <strong>View Logs</strong></li>
+      <li><strong>Import API échoue</strong> : vérifiez que <code>API_FOOTBALL_KEY</code> est bien définie dans Railway Variables</li>
+      <li><strong>Matchs non verrouillés</strong> : les horaires sont en UTC. Un match à 21h en France = 19h00 UTC en hiver, 20h00 UTC en été</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>
