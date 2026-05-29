@@ -55,11 +55,25 @@
   {% if season %}
   <div class="card" style="margin-bottom:1.5rem;">
     <h2 style="margin-bottom:.75rem;">Actions — {{ season.name }}</h2>
-    <div style="display:flex; gap:.75rem; flex-wrap:wrap; align-items:center;">
-      <button id="btn_update_scores" class="btn btn-primary" onclick="updateScoresApi()">
-        🔄 Mettre à jour les scores (API)
-      </button>
-      <span style="font-size:.8rem; color:var(--muted);">Récupère les résultats via API-Football</span>
+    <div style="display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-start;">
+
+      <!-- Import saison complète -->
+      <div style="display:flex; flex-direction:column; gap:.35rem;">
+        <button id="btn_import_saison" class="btn btn-primary" onclick="importSaisonComplete()">
+          📥 Importer toute la saison (API)
+        </button>
+        <span style="font-size:.78rem; color:var(--muted);">Importe les 34 journées en une fois</span>
+        <div id="import_saison_progress" style="display:none; font-size:.8rem; color:var(--accent);"></div>
+      </div>
+
+      <!-- Mise à jour scores -->
+      <div style="display:flex; flex-direction:column; gap:.35rem;">
+        <button id="btn_update_scores" class="btn btn-secondary" onclick="updateScoresApi()">
+          🔄 Mettre à jour les scores (API)
+        </button>
+        <span style="font-size:.78rem; color:var(--muted);">Récupère les résultats du week-end</span>
+      </div>
+
     </div>
   </div>
 
