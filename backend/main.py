@@ -12,7 +12,8 @@ import os
 from datetime import datetime, timezone
 
 from database import (get_db, init_db, seed_users, seed_active_season,
-                      ensure_season_exists, get_current_season_years)
+                      ensure_season_exists, get_current_season_years,
+                      q, qone, qall)
 from scoring import (compute_points, compute_estimate_points,
                      compute_matchday_stats, compute_general_ranking)
 from api_football import import_matchday_to_db, update_live_scores, fetch_fixtures
@@ -30,18 +31,6 @@ templates = Jinja2Templates(directory=os.path.join(FRONTEND_DIR, "templates"))
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
-
-def q(conn, sql, params=None):
-    """Exécute une requête et retourne le curseur."""
-    c = conn.cursor()
-    c.execute(sql, params or ())
-    return c
-
-def qone(conn, sql, params=None):
-    return q(conn, sql, params).fetchone()
-
-def qall(conn, sql, params=None):
-    return q(conn, sql, params).fetchall()
 
 def hash_password(pwd): return hashlib.sha256(pwd.encode()).hexdigest()
 def get_current_user(request): return request.session.get("user")
@@ -569,7 +558,6 @@ async def admin_import_saison_complete(request: Request):
         except Exception as e:
             total_errors.append(f"J{jn}: {str(e)}")
 
-    conn.commit()
     journees_vides = [md["number"] for md in matchdays if md["number"] not in journees_ok]
     conn.close()
     return JSONResponse({"ok": True, "total_imported": total_imported,
@@ -630,7 +618,6 @@ async def chat_send(request: Request, message: str = Form(...)):
     c = conn.cursor()
     c.execute("INSERT INTO chat_messages (user_id, message) VALUES (%s, %s) RETURNING id", (user["id"], message))
     new_id = c.fetchone()["id"]
-    conn.commit()
     row = qone(conn, """
         SELECT cm.id, cm.message, cm.created_at, u.username
         FROM chat_messages cm JOIN users u ON u.id=cm.user_id WHERE cm.id=%s
