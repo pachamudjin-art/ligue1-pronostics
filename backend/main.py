@@ -576,6 +576,7 @@ async def admin_import_saison_complete(request: Request):
             total_errors.append(f"J{jn}: {str(e)}")
 
     journees_vides = [md["number"] for md in matchdays if md["number"] not in journees_ok]
+    conn.commit()
     release_db(conn)
     return JSONResponse({"ok": True, "total_imported": total_imported,
                          "journees_importees": sorted(journees_ok),
@@ -588,6 +589,7 @@ async def admin_update_scores_api(request: Request):
     season = get_active_season()
     conn = get_db()
     nb = update_live_scores(season["year_start"], conn)
+    conn.commit()
     release_db(conn)
     return JSONResponse({"ok": True, "updated": nb})
 
