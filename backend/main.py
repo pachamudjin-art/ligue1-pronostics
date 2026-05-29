@@ -113,6 +113,11 @@ def compute_ranking_for_season(season_id, conn):
             est = qone(conn, "SELECT estimated_score FROM score_estimates WHERE user_id=%s AND matchday_id=%s",
                        (u["id"], md["id"]))
             if est:
+                # Vérifier que TOUS les matchs de la journée sont terminés
+                total_matches = qone(conn, "SELECT COUNT(*) as cnt FROM matches WHERE matchday_id=%s", (md["id"],))
+                finished_matches = qone(conn, "SELECT COUNT(*) as cnt FROM matches WHERE matchday_id=%s AND home_score IS NOT NULL", (md["id"],))
+                if not total_matches or not finished_matches: continue
+                if total_matches["cnt"] == 0 or finished_matches["cnt"] < total_matches["cnt"]: continue
                 md_rows = qall(conn, """
                     SELECT p.home_score as pred_home, p.away_score as pred_away,
                            m.home_score as real_home, m.away_score as real_away
@@ -340,7 +345,7 @@ async def journee(request: Request, season_id: int, number: int):
             est = qone(conn, "SELECT estimated_score FROM score_estimates WHERE user_id=%s AND matchday_id=%s",
                       (u["id"], matchday["id"]))
             est_pts = 0
-            if est and stats["points"] > 0:
+            if est and len(finished_matches) == len(matches):
                 est_pts = compute_estimate_points(stats["points"], est["estimated_score"])
 
             matchday_ranking.append({
