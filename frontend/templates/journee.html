@@ -46,6 +46,59 @@
 
   <h1>{{ matchday.label or "Journée " ~ matchday.number }}</h1>
 
+  <!-- Pronostic Podium (compétitions cup, 1ère phase) -->
+  {% if show_podium %}
+  <div class="card" style="margin-bottom:1.2rem; background:linear-gradient(135deg,rgba(232,196,90,.06),rgba(232,196,90,.02)); border-color:rgba(232,196,90,.25);">
+    <h2 style="margin-bottom:.85rem;">🏅 Pronostic Podium</h2>
+    {% if podium_locked %}
+      {% if my_podium %}
+      <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.5rem;">
+        {% for label, team in [('🥇', my_podium.rank1), ('🥈', my_podium.rank2), ('🥉', my_podium.rank3)] %}
+        <span style="background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:.25rem .65rem; font-size:.88rem;">
+          {{ label }} <strong>{{ team }}</strong>
+          {% if podium_result %}
+            {% set real = [podium_result.rank1, podium_result.rank2, podium_result.rank3] %}
+            {% if loop.index == 1 and team == podium_result.rank1 %}<span style="color:var(--accent)"> +10</span>
+            {% elif loop.index == 2 and team == podium_result.rank2 %}<span style="color:var(--green)"> +5</span>
+            {% elif loop.index == 3 and team == podium_result.rank3 %}<span style="color:var(--green)"> +5</span>
+            {% elif team in real %}<span style="color:#f39c12"> +3</span>
+            {% else %}<span style="color:var(--muted)"> +0</span>{% endif %}
+          {% endif %}
+        </span>
+        {% endfor %}
+      </div>
+      {% else %}
+        <p style="color:var(--muted); font-size:.85rem;">Vous n'avez pas saisi de pronostic podium.</p>
+      {% endif %}
+      <span class="badge badge-lock">Pronostic verrouillé</span>
+    {% else %}
+      <form id="podium-form-j" onsubmit="submitPodium(event, {{ season.id }})">
+        <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.65rem; align-items:center;">
+          {% for label, field, current in [
+            ('🥇 Vainqueur', 'rank1', my_podium.rank1 if my_podium else ''),
+            ('🥈 Finaliste', 'rank2', my_podium.rank2 if my_podium else ''),
+            ('🥉 3ème', 'rank3', my_podium.rank3 if my_podium else '')
+          ] %}
+          {% if podium_teams %}
+          <select name="{{ field }}" class="admin-in" style="flex:1; min-width:140px;" required>
+            <option value="">{{ label }}</option>
+            {% for t in podium_teams %}
+            <option value="{{ t }}" {% if t == current %}selected{% endif %}>{{ label[:2] }} {{ t }}</option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <input type="text" name="{{ field }}" class="admin-in" style="flex:1; min-width:120px;"
+                 value="{{ current }}" placeholder="{{ label }}" required>
+          {% endif %}
+          {% endfor %}
+          <button type="submit" class="btn btn-primary btn-sm">✓ Valider</button>
+        </div>
+      </form>
+      <p style="font-size:.75rem; color:var(--muted);">Verrouillé au coup d'envoi du 1er match · Bonus : vainqueur=10pts, bonne place=5pts, podium=3pts</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <!-- Joueurs sans pronostic -->
   {% if missing_pronostics and not read_only %}
   <div style="background:rgba(192,57,43,.08); border:1px solid rgba(192,57,43,.2);
@@ -193,7 +246,18 @@
           <div class="my-prono">
             <span style="font-size:.8rem; color:var(--muted);">Mon prono :</span>
             {% if my_p %}
-              <span class="score-display">{{ my_p.home_score }} – {{ my_p.away_score }}</span>
+              {% set pts_info = points_by_match.get(m.id) %}
+              {% if pts_info and pts_info.label == 'BB' %}
+                <span class="score-display" style="border-color:#9b59b6; color:#9b59b6;">{{ my_p.home_score }} – {{ my_p.away_score }}</span>
+              {% elif pts_info and pts_info.label == 'PP' %}
+                <span class="score-display" style="border-color:var(--accent); color:var(--accent);">{{ my_p.home_score }} – {{ my_p.away_score }}</span>
+              {% elif pts_info and pts_info.label == 'PA' %}
+                <span class="score-display" style="border-color:var(--green); color:var(--green);">{{ my_p.home_score }} – {{ my_p.away_score }}</span>
+              {% elif pts_info and pts_info.label == 'PJ' %}
+                <span class="score-display" style="border-color:#3498db; color:#3498db;">{{ my_p.home_score }} – {{ my_p.away_score }}</span>
+              {% else %}
+                <span class="score-display">{{ my_p.home_score }} – {{ my_p.away_score }}</span>
+              {% endif %}
             {% else %}
               <span style="color:var(--muted); font-size:.85rem">Non pronostiqué</span>
             {% endif %}
