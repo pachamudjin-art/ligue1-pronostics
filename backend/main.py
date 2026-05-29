@@ -388,6 +388,28 @@ async def journee(request: Request, season_id: int, number: int):
             else:
                 p["rank"] = 1
 
+    # Podium (pour compétitions cup, uniquement 1ère journée)
+    season_data = get_season_by_id(season_id)
+    show_podium = (
+        season_data and season_data.get("competition_type") == "cup"
+        and number == min(all_matchdays) if all_matchdays else False
+    )
+    my_podium = None
+    podium_result = None
+    podium_locked = False
+    podium_teams = []
+    if show_podium:
+        my_podium = qone(conn, "SELECT * FROM podium_pronostics WHERE user_id=%s AND season_id=%s",
+                         (user["id"], season_id))
+        podium_result = qone(conn, "SELECT * FROM podium_results WHERE season_id=%s", (season_id,))
+        if first_ko:
+            podium_locked = datetime.now(timezone.utc) >= first_ko
+        if not podium_locked:
+            try:
+                podium_teams = sorted(fetch_teams(season_data.get("api_code", "FL1"), season_data["year_start"]))
+            except:
+                pass
+
     all_seasons = get_all_seasons()
     release_db(conn)
 
@@ -408,6 +430,11 @@ async def journee(request: Request, season_id: int, number: int):
         "missing_pronostics": missing_pronostics,
         "matchday_ranking": matchday_ranking,
         "nb_finished": len(finished_matches),
+        "show_podium": show_podium,
+        "my_podium": dict(my_podium) if my_podium else None,
+        "podium_result": dict(podium_result) if podium_result else None,
+        "podium_locked": podium_locked,
+        "podium_teams": podium_teams,
     })
 
 @app.get("/journee/{number}", response_class=HTMLResponse)

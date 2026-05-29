@@ -18,6 +18,54 @@ from datetime import datetime
 
 BASE_URL = "https://api.football-data.org/v4"
 
+# Traduction des noms d'équipes anglais → français
+TEAMS_FR = {
+    "Morocco": "Maroc", "Portugal": "Portugal", "Argentina": "Argentine",
+    "USA": "États-Unis", "United States": "États-Unis",
+    "Spain": "Espagne", "Netherlands": "Pays-Bas", "Australia": "Australie",
+    "New Zealand": "Nouvelle-Zélande", "England": "Angleterre", "France": "France",
+    "Senegal": "Sénégal", "Panama": "Panama", "Germany": "Allemagne",
+    "Japan": "Japon", "Colombia": "Colombie", "Saudi Arabia": "Arabie Saoudite",
+    "Brazil": "Brésil", "Nigeria": "Nigéria", "Switzerland": "Suisse",
+    "Korea Republic": "Corée du Sud", "South Korea": "Corée du Sud",
+    "Mexico": "Mexique", "Ecuador": "Équateur", "Poland": "Pologne",
+    "Cameroon": "Cameroun", "Belgium": "Belgique", "Uruguay": "Uruguay",
+    "Croatia": "Croatie", "Honduras": "Honduras", "Serbia": "Serbie",
+    "Denmark": "Danemark", "Chile": "Chili", "South Africa": "Afrique du Sud",
+    "Italy": "Italie", "Ukraine": "Ukraine", "Sweden": "Suède",
+    "Turkey": "Turquie", "Iran": "Iran", "Ghana": "Ghana",
+    "Tunisia": "Tunisie", "Algeria": "Algérie", "Egypt": "Égypte",
+    "Ivory Coast": "Côte d'Ivoire", "Costa Rica": "Costa Rica",
+    "Canada": "Canada", "Peru": "Pérou", "Bolivia": "Bolivie",
+    "Venezuela": "Venezuela", "Paraguay": "Paraguay", "Qatar": "Qatar",
+    "Iraq": "Irak", "United Arab Emirates": "Émirats Arabes Unis",
+    "Uzbekistan": "Ouzbékistan", "Indonesia": "Indonésie",
+    "China": "Chine", "Thailand": "Thaïlande", "Guatemala": "Guatemala",
+    "Jamaica": "Jamaïque", "El Salvador": "Salvador", "Haiti": "Haïti",
+    "New Caledonia": "Nouvelle-Calédonie", "Fiji": "Fidji",
+    "Czech Republic": "Rép. Tchèque", "Czechia": "Rép. Tchèque",
+    "Slovakia": "Slovaquie", "Romania": "Roumanie", "Hungary": "Hongrie",
+    "Greece": "Grèce", "Austria": "Autriche", "Scotland": "Écosse",
+    "Wales": "Pays de Galles", "Ireland": "Irlande", "Norway": "Norvège",
+    "Finland": "Finlande", "Israel": "Israël", "Kosovo": "Kosovo",
+    "Albania": "Albanie", "Slovenia": "Slovénie",
+    "Bosnia and Herzegovina": "Bosnie-Herzégovine",
+    "North Macedonia": "Macédoine du Nord", "Montenegro": "Monténégro",
+    "Georgia": "Géorgie", "Armenia": "Arménie", "Kazakhstan": "Kazakhstan",
+    "Lebanon": "Liban", "Syria": "Syrie", "Kuwait": "Koweït",
+    "Cape Verde": "Cap-Vert", "Guinea": "Guinée", "Gabon": "Gabon",
+    "Zambia": "Zambie", "Angola": "Angola", "Ethiopia": "Éthiopie",
+    "Rwanda": "Rwanda", "Mali": "Mali", "Burkina Faso": "Burkina Faso",
+    "Togo": "Togo", "DR Congo": "RD Congo", "Congo": "Congo",
+    "Zimbabwe": "Zimbabwe", "Tanzania": "Tanzanie", "Uganda": "Ouganda",
+    "Kenya": "Kenya", "Mozambique": "Mozambique",
+    "Trinidad and Tobago": "Trinité-et-Tobago",
+}
+
+def translate_team(name: str) -> str:
+    """Traduit un nom d'équipe anglais en français."""
+    return TEAMS_FR.get(name, name)
+
 
 def _request(endpoint: str, params: dict = None) -> dict | None:
     api_key = os.environ.get("FOOTBALL_DATA_KEY", "")
@@ -72,8 +120,8 @@ def fetch_fixtures(season_year: int, matchday: int = None, competition_code: str
         # Nom des équipes : shortName ou name
         home = match["homeTeam"]
         away = match["awayTeam"]
-        home_name = home.get("shortName") or home.get("name", "?")
-        away_name = away.get("shortName") or away.get("name", "?")
+        home_name = translate_team(home.get("shortName") or home.get("name", "?"))
+        away_name = translate_team(away.get("shortName") or away.get("name", "?"))
 
         result.append({
             "external_id": match.get("id"),
@@ -94,7 +142,7 @@ def fetch_teams(competition_code: str, season_year: int) -> list:
     data = _request(f"competitions/{competition_code}/teams", {"season": season_year})
     if not data or "teams" not in data:
         return []
-    return [t.get("shortName") or t.get("name") for t in data["teams"]]
+    return [translate_team(t.get("shortName") or t.get("name", "?")) for t in data["teams"]]
 
 
 def import_matchday_to_db(season_year: int, matchday_number: int,
