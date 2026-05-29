@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Hall of Fame — L1 Pronostics{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <h1>🏆 Hall of Fame</h1>
+  <p style="color:var(--muted); font-size:.88rem; margin-bottom:2rem;">
+    15 saisons de pronostics · Les légendes du groupe
+  </p>
+
+  <!-- Palmarès titres -->
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:2rem;">
+
+    <!-- Champions -->
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div style="padding:.75rem 1rem; background:rgba(232,196,90,.1); border-bottom:1px solid rgba(232,196,90,.2);">
+        <span style="font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:.05em; color:var(--accent);">
+          🥇 Palmarès champions
+        </span>
+      </div>
+      <table style="width:100%; border-collapse:collapse; font-size:.85rem;">
+        <tbody>
+          {% for joueur, nb in champ_count.items() %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:.5rem .85rem; font-weight:600;">{{ joueur }}</td>
+            <td style="padding:.5rem .85rem; text-align:right;">
+              {% for i in range(nb) %}🏆{% endfor %}
+              <span style="color:var(--muted); font-size:.75rem; margin-left:.3rem">× {{ nb }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Cuillères -->
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div style="padding:.75rem 1rem; background:rgba(192,57,43,.06); border-bottom:1px solid rgba(192,57,43,.15);">
+        <span style="font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:.05em; color:#e74c3c;">
+          🥄 Palmarès cuillères de bois
+        </span>
+      </div>
+      <table style="width:100%; border-collapse:collapse; font-size:.85rem;">
+        <tbody>
+          {% for joueur, nb in cuil_count.items() %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:.5rem .85rem; font-weight:600;">{{ joueur }}</td>
+            <td style="padding:.5rem .85rem; text-align:right;">
+              {% for i in range(nb) %}🥄{% endfor %}
+              <span style="color:var(--muted); font-size:.75rem; margin-left:.3rem">× {{ nb }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- Historique saison par saison -->
+  <div class="card" style="padding:0; overflow:hidden; margin-bottom:1.5rem;">
+    <div style="padding:.75rem 1rem; background:var(--surface2); border-bottom:1px solid var(--border);">
+      <span style="font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:.05em;">
+        📅 Historique saison par saison
+      </span>
+    </div>
+    <table class="ranking-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Saison</th>
+          <th>🥇 Champion</th>
+          <th style="text-align:right;">Pts</th>
+          <th>🥄 Cuillère</th>
+          <th style="text-align:right;">Pts</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in range(champions|length) %}
+        {% set c = champions[i] %}
+        {% set cu = cuilleres[i] if i < cuilleres|length else none %}
+        <tr>
+          <td style="color:var(--muted); font-size:.8rem;">{{ c.num }}</td>
+          <td style="font-weight:600; color:var(--text);">{{ c.saison }}</td>
+          <td>
+            <span style="color:var(--accent); font-weight:600;">{{ c.joueur }}</span>
+          </td>
+          <td style="text-align:right; color:var(--muted); font-size:.85rem;">
+            {{ c.points if c.points else '—' }}
+          </td>
+          <td>
+            {% if cu %}
+            <span style="color:#e74c3c;">{{ cu.joueur }}</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right; color:var(--muted); font-size:.85rem;">
+            {% if cu %}{{ cu.points if cu.points else '—' }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Admin : ajouter une entrée -->
+  {% if user.is_admin %}
+  <div class="card">
+    <h2 style="margin-bottom:.85rem;">⚙ Ajouter une entrée</h2>
+    <form method="post" action="/admin/hall-of-fame/add"
+          style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr auto; gap:.5rem; align-items:end;">
+      <div>
+        <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.25rem;">Type</label>
+        <select name="type" class="admin-in">
+          <option value="champions">Champion</option>
+          <option value="cuilleres">Cuillère de bois</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.25rem;">Saison</label>
+        <input type="text" name="saison" class="admin-in" placeholder="ex: 2026-2027" required>
+      </div>
+      <div>
+        <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.25rem;">Joueur</label>
+        <select name="joueur" class="admin-in">
+          {% for name in ['Malherbe','Ben','Seb','Coach','Ricardo','Dreux','Mathieu','La Dame blanche','Le Doubs'] %}
+          <option value="{{ name }}">{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.25rem;">Points (optionnel)</label>
+        <input type="number" name="points" class="admin-in" placeholder="ex: 620" min="0">
+      </div>
+      <button type="submit" class="btn btn-primary">Ajouter</button>
+    </form>
+    <p style="font-size:.75rem; color:var(--muted); margin-top:.6rem;">
+      ⚠ Les entrées ajoutées ici sont temporaires (réinitialisées au redémarrage). Pour les rendre permanentes, demandez une mise à jour du code.
+    </p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

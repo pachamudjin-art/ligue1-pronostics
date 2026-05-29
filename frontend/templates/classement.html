@@ -46,7 +46,20 @@
           <td class="rank-num">
             {% if p.rank == 1 %}🥇{% elif p.rank == 2 %}🥈{% elif p.rank == 3 %}🥉{% else %}{{ p.rank }}{% endif %}
           </td>
-          <td class="player-cell">{{ p.username }}{% if p.rank == 1 %}<span style="font-size:.7rem; color:var(--accent); margin-left:.3rem">leader</span>{% endif %}</td>
+          <td class="player-cell">
+            {{ p.username }}
+            {% if p.rank == 1 %}
+              {% if season.id != active_season_id %}
+                <span style="font-size:.7rem; color:var(--accent); margin-left:.3rem">champion</span>
+              {% else %}
+                <span style="font-size:.7rem; color:var(--accent); margin-left:.3rem">leader</span>
+              {% endif %}
+            {% elif loop.last %}
+              {% if season.id != active_season_id %}
+                <span style="font-size:.7rem; color:#e74c3c; margin-left:.3rem">cuillère de bois</span>
+              {% endif %}
+            {% endif %}
+          </td>
           <td class="pts-cell" style="text-align:right;">{{ p.points }}</td>
           <td style="text-align:center; color:var(--muted);">{{ p.pj }}</td>
           <td style="text-align:center; color:var(--muted);">{{ p.pp }}</td>
