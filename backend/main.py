@@ -537,6 +537,46 @@ async def admin_import_api(request: Request, matchday_number: int = Form(...),
     conn.close()
     return JSONResponse({"ok": True, "imported": nb, "errors": errors, "api_year": year_to_use})
 
+@app.post("/admin/import-saison-complete")
+async def admin_import_saison_complete(request: Request):
+    require_admin(request)
+    season = get_active_season()
+    conn = get_db()
+    year_to_use = season["year_start"]
+
+    total_imported = 0
+    total_errors = []
+    journees_ok = []
+    journees_vides = []
+
+    matchdays = conn.execute(
+        "SELECT * FROM matchdays WHERE season_id=? ORDER BY number",
+        (season["id"],)
+    ).fetchall()
+
+    for md in matchdays:
+        nb, errors = import_matchday_to_db(
+            year_to_use, md["number"], season["id"], md["id"], conn
+        )
+        if nb > 0:
+            total_imported += nb
+            journees_ok.append(md["number"])
+        if errors:
+            total_errors.extend([f"J{md['number']}: {e}" for e in errors])
+        if nb == 0 and not errors:
+            journees_vides.append(md["number"])
+
+    conn.close()
+    print(f"[IMPORT COMPLET] {total_imported} matchs importés sur {len(matchdays)} journées")
+    return JSONResponse({
+        "ok": True,
+        "total_imported": total_imported,
+        "journees_importees": journees_ok,
+        "journees_vides": journees_vides,
+        "errors": total_errors[:10]  # max 10 erreurs affichées
+    })
+
+
 @app.post("/admin/update-scores-api")
 async def admin_update_scores_api(request: Request):
     require_admin(request)
