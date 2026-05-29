@@ -799,36 +799,35 @@ async def admin_import_ods(request: Request):
                 continue
 
             # Index des matchs par paire d'équipes normalisée
-                def norm(s):
-                    return str(s).strip().lower() if s else ''
-                match_index = {}
-                for m in matches:
-                    key = (norm(m['home_team']), norm(m['away_team']))
-                    match_index[key] = m
+            def norm(s):
+                return str(s).strip().lower() if s else ''
+            match_index = {}
+            for m in matches:
+                key = (norm(m['home_team']), norm(m['away_team']))
+                match_index[key] = m
 
-                for player, pronos in data['pronostics'].items():
-                    user_id = users.get(player)
-                    if not user_id:
+            for player, pronos in data['pronostics'].items():
+                user_id = users.get(player)
+                if not user_id:
+                    continue
+                for prono in pronos:
+                    if prono is None:
                         continue
-                    for prono in pronos:
-                        if prono is None:
-                            continue
-                        # Chercher le match par noms d'équipes
-                        key = (norm(prono.get('home_team','')), norm(prono.get('away_team','')))
-                        match = match_index.get(key)
-                        if not match:
-                            errors.append(f"J{jn} {player}: match {prono.get('home_team')} vs {prono.get('away_team')} introuvable")
-                            continue
-                        try:
-                            q(conn2, """
-                                INSERT INTO pronostics (user_id, match_id, home_score, away_score)
-                                VALUES (%s, %s, %s, %s)
-                                ON CONFLICT(user_id, match_id) DO UPDATE SET
-                                    home_score=EXCLUDED.home_score, away_score=EXCLUDED.away_score
-                            """, (user_id, match['id'], prono['home_score'], prono['away_score']))
-                            total_pronos += 1
-                        except Exception as e:
-                            errors.append(f"J{jn} {player}: {str(e)[:50]}")
+                    key = (norm(prono.get('home_team','')), norm(prono.get('away_team','')))
+                    match = match_index.get(key)
+                    if not match:
+                        errors.append(f"J{jn} {player}: match {prono.get('home_team')} vs {prono.get('away_team')} introuvable")
+                        continue
+                    try:
+                        q(conn2, """
+                            INSERT INTO pronostics (user_id, match_id, home_score, away_score)
+                            VALUES (%s, %s, %s, %s)
+                            ON CONFLICT(user_id, match_id) DO UPDATE SET
+                                home_score=EXCLUDED.home_score, away_score=EXCLUDED.away_score
+                        """, (user_id, match['id'], prono['home_score'], prono['away_score']))
+                        total_pronos += 1
+                    except Exception as e:
+                        errors.append(f"J{jn} {player}: {str(e)[:50]}")
 
             for player, estimation in data['estimations'].items():
                 if estimation is None:
