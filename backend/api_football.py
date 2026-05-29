@@ -1,8 +1,8 @@
 """
-Intégration API-Football (api-football.com) pour récupérer le calendrier Ligue 1.
-Plan gratuit : 100 requêtes/jour, suffisant pour un usage entre amis.
-
-Ligue 1 = league_id 61 sur API-Football.
+Intégration football-data.org — Gratuit, Ligue 1 couverte pour toujours.
+Ligue 1 = competition code "FL1"
+Clé API : créer un compte gratuit sur https://www.football-data.org/client/register
+Variable d'environnement : FOOTBALL_DATA_KEY
 """
 
 import urllib.request
@@ -11,31 +11,33 @@ import json
 import os
 from datetime import datetime
 
-API_KEY = os.environ.get("API_FOOTBALL_KEY", "")
-BASE_URL = "https://v3.football.api-sports.io"
-LEAGUE_ID = 61  # Ligue 1
+BASE_URL = "https://api.football-data.org/v4"
+COMPETITION_CODE = "FL1"  # Ligue 1
 
 
-def _request(endpoint: str, params: dict) -> dict | None:
-    # Relit la clé à chaque appel pour prendre en compte les changements de variable d'env
-    api_key = os.environ.get("API_FOOTBALL_KEY", "")
+def _request(endpoint: str, params: dict = None) -> dict | None:
+    api_key = os.environ.get("FOOTBALL_DATA_KEY", "")
     if not api_key:
-        print("API_FOOTBALL_KEY non définie.")
+        print("FOOTBALL_DATA_KEY non définie.")
         return None
 
-    query = "&".join(f"{k}={v}" for k, v in params.items())
-    url = f"{BASE_URL}/{endpoint}?{query}"
+    query = ("?" + "&".join(f"{k}={v}" for k, v in params.items())) if params else ""
+    url = f"{BASE_URL}/{endpoint}{query}"
     req = urllib.request.Request(url)
-    req.add_header("x-apisports-key", api_key)
+    req.add_header("X-Auth-Token", api_key)
 
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        print(f"Erreur HTTP football-data.org {e.code} ({url}): {body[:300]}")
+        return None
     except urllib.error.URLError as e:
-        print(f"Erreur API-Football ({url}): {e}")
+        print(f"Erreur réseau football-data.org ({url}): {e}")
         return None
     except Exception as e:
-        print(f"Erreur inattendue API-Football: {e}")
+        print(f"Erreur inattendue football-data.org: {e}")
         return None
 
 
@@ -44,71 +46,60 @@ def fetch_fixtures(season_year: int, matchday: int | None = None) -> list:
     Récupère les matchs d'une saison (et optionnellement d'une journée).
     Retourne une liste de dicts normalisés.
     """
-    params = {"league": LEAGUE_ID, "season": season_year}
+    params = {"season": season_year}
     if matchday is not None:
-        params["round"] = f"Regular Season - {matchday}"
+        params["matchday"] = matchday
 
-    data = _request("fixtures", params)
-    if not data or "response" not in data:
+    data = _request(f"competitions/{COMPETITION_CODE}/matches", params)
+    if not data or "matches" not in data:
         return []
 
     result = []
-    for fixture in data["response"]:
-        f = fixture["fixture"]
-        teams = fixture["teams"]
-        goals = fixture["goals"]
-
-        kickoff_raw = f.get("date", "")
+    for match in data["matches"]:
+        utc_date = match.get("utcDate", "")
         try:
-            kickoff_dt = datetime.fromisoformat(kickoff_raw.replace("Z", "+00:00"))
-            kickoff_str = kickoff_dt.strftime("%Y-%m-%d %H:%M:%S")
+            dt = datetime.fromisoformat(utc_date.replace("Z", "+00:00"))
+            kickoff_str = dt.strftime("%Y-%m-%d %H:%M:%S")
         except Exception:
-            kickoff_str = kickoff_raw
+            kickoff_str = utc_date[:19].replace("T", " ")
 
-        # Extraction du numéro de journée
-        round_str = fixture.get("league", {}).get("round", "")
-        matchday_number = None
-        if "Regular Season - " in round_str:
-            try:
-                matchday_number = int(round_str.split("Regular Season - ")[1])
-            except Exception:
-                pass
-
-        status = f.get("status", {}).get("short", "NS")
-        # Normalisation du statut
-        if status in ("FT", "AET", "PEN"):
+        status_raw = match.get("status", "SCHEDULED")
+        if status_raw in ("FINISHED",):
             norm_status = "finished"
-        elif status in ("1H", "2H", "HT", "ET", "P", "LIVE"):
+        elif status_raw in ("IN_PLAY", "PAUSED"):
             norm_status = "live"
-        elif status in ("PST", "CANC", "ABD"):
+        elif status_raw in ("POSTPONED", "CANCELLED", "SUSPENDED"):
             norm_status = "postponed"
         else:
             norm_status = "scheduled"
 
+        score = match.get("score", {})
+        full_time = score.get("fullTime", {})
+        home_score = full_time.get("home")
+        away_score = full_time.get("away")
+
         result.append({
-            "external_id": f["id"],
-            "home_team": teams["home"]["name"],
-            "away_team": teams["away"]["name"],
+            "external_id": match.get("id"),
+            "home_team": match["homeTeam"]["shortName"] or match["homeTeam"]["name"],
+            "away_team": match["awayTeam"]["shortName"] or match["awayTeam"]["name"],
             "kickoff_time": kickoff_str,
-            "home_score": goals.get("home"),
-            "away_score": goals.get("away"),
+            "home_score": home_score,
+            "away_score": away_score,
             "status": norm_status,
-            "matchday_number": matchday_number,
+            "matchday_number": match.get("matchday"),
         })
 
     return result
 
 
 def import_matchday_to_db(season_year: int, matchday_number: int,
-                           season_id: int, matchday_id: int,
-                           conn) -> tuple[int, list]:
+                           season_id: int, matchday_id: int, conn) -> tuple[int, list]:
     """
     Importe les matchs d'une journée depuis l'API vers la DB.
-    Retourne (nb_importés, erreurs).
     """
     fixtures = fetch_fixtures(season_year, matchday_number)
     if not fixtures:
-        return 0, ["Aucun match récupéré depuis l'API (vérifiez la clé API ou la connexion)."]
+        return 0, ["Aucun match récupéré depuis l'API (vérifiez FOOTBALL_DATA_KEY ou la connexion)."]
 
     c = conn.cursor()
     imported = 0
@@ -154,7 +145,6 @@ def import_matchday_to_db(season_year: int, matchday_number: int,
 def update_live_scores(season_year: int, conn) -> int:
     """
     Met à jour les scores des matchs en cours ou récents.
-    Retourne le nombre de matchs mis à jour.
     """
     fixtures = fetch_fixtures(season_year)
     c = conn.cursor()

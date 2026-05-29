@@ -520,19 +520,22 @@ async def admin_delete_match(request: Request, match_id: int = Form(...)):
     return RedirectResponse(f"/admin/journee/{md_row['number']}", status_code=303)
 
 @app.post("/admin/import-api")
-async def admin_import_api(request: Request, matchday_number: int = Form(...)):
+async def admin_import_api(request: Request, matchday_number: int = Form(...),
+                           api_year: int = Form(None)):
     require_admin(request)
     season = get_active_season()
     conn = get_db()
+    year_to_use = api_year if api_year else season["year_start"]
+    print(f"[IMPORT] Saison={season['name']} year_start={season['year_start']} | API year={year_to_use} | J{matchday_number}")
     matchday = conn.execute(
         "SELECT * FROM matchdays WHERE season_id=? AND number=?", (season["id"], matchday_number)
     ).fetchone()
     if not matchday:
         conn.close()
-        return JSONResponse({"ok": False, "error": "Journée introuvable"})
-    nb, errors = import_matchday_to_db(season["year_start"], matchday_number, season["id"], matchday["id"], conn)
+        return JSONResponse({"ok": False, "error": f"Journee {matchday_number} introuvable (season_id={season['id']})"})
+    nb, errors = import_matchday_to_db(year_to_use, matchday_number, season["id"], matchday["id"], conn)
     conn.close()
-    return JSONResponse({"ok": True, "imported": nb, "errors": errors})
+    return JSONResponse({"ok": True, "imported": nb, "errors": errors, "api_year": year_to_use})
 
 @app.post("/admin/update-scores-api")
 async def admin_update_scores_api(request: Request):
@@ -693,6 +696,7 @@ async def admin_test_api(request: Request):
     import urllib.request, urllib.error, json as _json
     api_key = os.environ.get("API_FOOTBALL_KEY", "")
     results = {}
+    api_key = os.environ.get("FOOTBALL_DATA_KEY", "")
     results["cle_presente"] = bool(api_key)
     results["cle_debut"] = api_key[:8] + "..." if api_key else "ABSENTE"
     try:
@@ -701,14 +705,15 @@ async def admin_test_api(request: Request):
     except Exception as e:
         results["reseau_general"] = f"ECHEC: {str(e)}"
     try:
-        req = urllib.request.Request("https://v3.football.api-sports.io/status")
-        req.add_header("x-apisports-key", api_key)
+        req = urllib.request.Request("https://api.football-data.org/v4/competitions/FL1")
+        req.add_header("X-Auth-Token", api_key)
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = _json.loads(resp.read())
-            results["api_football"] = "OK"
-            results["api_reponse"] = str(data)[:400]
+            results["api_football_data"] = "OK"
+            results["competition"] = data.get("name", "?")
+            results["saison_courante"] = str(data.get("currentSeason", {}).get("startDate", "?"))
     except Exception as e:
-        results["api_football"] = f"ECHEC: {str(e)}"
+        results["api_football_data"] = f"ECHEC: {str(e)}"
     return JSONResponse(results)
 
 
@@ -716,15 +721,15 @@ async def admin_test_api(request: Request):
 async def admin_test_fixtures(request: Request, season: int = 2025, journee: int = 1):
     require_admin(request)
     import urllib.request, json as _json, os
-    api_key = os.environ.get("API_FOOTBALL_KEY", "")
-    url = f"https://v3.football.api-sports.io/fixtures?league=61&season={season}&round=Regular+Season+-+{journee}"
+    api_key = os.environ.get("FOOTBALL_DATA_KEY", "")
+    url = f"https://api.football-data.org/v4/competitions/FL1/matches?season={season}&matchday={journee}"
     req = urllib.request.Request(url)
-    req.add_header("x-apisports-key", api_key)
+    req.add_header("X-Auth-Token", api_key)
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = _json.loads(resp.read())
-            nb = len(data.get("response", []))
-            sample = data.get("response", [])[:2]
+            nb = len(data.get("matches", []))
+            sample = data.get("matches", [])[:2]
             return JSONResponse({
                 "url": url,
                 "nb_resultats": nb,
@@ -733,3 +738,39 @@ async def admin_test_fixtures(request: Request, season: int = 2025, journee: int
             })
     except Exception as e:
         return JSONResponse({"erreur": str(e)})
+
+
+# ─── Proxy GIPHY (clé protégée côté serveur) ─────────────────────────────────
+
+@app.get("/giphy/trending")
+async def giphy_trending(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"data": []}, status_code=401)
+    api_key = os.environ.get("GIPHY_KEY", "")
+    if not api_key:
+        return JSONResponse({"data": [], "error": "GIPHY_KEY non configurée"})
+    import urllib.request as _ur, json as _j
+    try:
+        url = f"https://api.giphy.com/v1/gifs/trending?api_key={api_key}&limit=12&rating=g"
+        with _ur.urlopen(url, timeout=10) as r:
+            return JSONResponse(_j.loads(r.read()))
+    except Exception as e:
+        return JSONResponse({"data": [], "error": str(e)})
+
+
+@app.get("/giphy/search")
+async def giphy_search(request: Request, q: str = ""):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"data": []}, status_code=401)
+    api_key = os.environ.get("GIPHY_KEY", "")
+    if not api_key:
+        return JSONResponse({"data": [], "error": "GIPHY_KEY non configurée"})
+    import urllib.request as _ur, json as _j, urllib.parse as _up
+    try:
+        url = f"https://api.giphy.com/v1/gifs/search?api_key={api_key}&q={_up.quote(q)}&limit=12&rating=g&lang=fr"
+        with _ur.urlopen(url, timeout=10) as r:
+            return JSONResponse(_j.loads(r.read()))
+    except Exception as e:
+        return JSONResponse({"data": [], "error": str(e)})
