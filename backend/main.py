@@ -713,6 +713,91 @@ async def giphy_search(request: Request, q_param: str = ""):
         return JSONResponse({"data": [], "error": str(e)})
 
 
+# ─── Import ODS ──────────────────────────────────────────────────────────────
+
+@app.post("/admin/import-ods")
+async def admin_import_ods(request: Request):
+    require_admin(request)
+    try:
+        import import_ods
+        import importlib
+        importlib.reload(import_ods)
+
+        conn = get_db()
+        season = qone(conn, "SELECT * FROM seasons WHERE is_active=1")
+        users = {u['username']: u['id'] for u in qall(conn, "SELECT id, username FROM users WHERE is_admin=0")}
+        release_db(conn)
+
+        total_pronos = 0
+        total_estimations = 0
+        errors = []
+
+        for jn_str, data in import_ods.ODS_DATA.items():
+            jn = int(jn_str)
+            conn2 = get_db()
+            matchday = qone(conn2, "SELECT * FROM matchdays WHERE season_id=%s AND number=%s",
+                           (season['id'], jn))
+            if not matchday:
+                release_db(conn2)
+                errors.append(f"J{jn}: journée introuvable")
+                continue
+
+            matches = qall(conn2, "SELECT * FROM matches WHERE matchday_id=%s ORDER BY kickoff_time",
+                          (matchday['id'],))
+            if not matches:
+                release_db(conn2)
+                errors.append(f"J{jn}: aucun match")
+                continue
+
+            for player, pronos in data['pronostics'].items():
+                user_id = users.get(player)
+                if not user_id:
+                    continue
+                for i, prono in enumerate(pronos):
+                    if prono is None or i >= len(matches):
+                        continue
+                    match = matches[i]
+                    try:
+                        q(conn2, """
+                            INSERT INTO pronostics (user_id, match_id, home_score, away_score)
+                            VALUES (%s, %s, %s, %s)
+                            ON CONFLICT(user_id, match_id) DO UPDATE SET
+                                home_score=EXCLUDED.home_score, away_score=EXCLUDED.away_score
+                        """, (user_id, match['id'], prono[0], prono[1]))
+                        total_pronos += 1
+                    except Exception as e:
+                        errors.append(f"J{jn} {player}: {str(e)[:50]}")
+
+            for player, estimation in data['estimations'].items():
+                if estimation is None:
+                    continue
+                user_id = users.get(player)
+                if not user_id:
+                    continue
+                try:
+                    q(conn2, """
+                        INSERT INTO score_estimates (user_id, matchday_id, estimated_score)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT(user_id, matchday_id) DO UPDATE SET
+                            estimated_score=EXCLUDED.estimated_score
+                    """, (user_id, matchday['id'], estimation))
+                    total_estimations += 1
+                except Exception as e:
+                    errors.append(f"J{jn} {player} est: {str(e)[:50]}")
+
+            conn2.commit()
+            release_db(conn2)
+
+        return JSONResponse({
+            "ok": True,
+            "pronos": total_pronos,
+            "estimations": total_estimations,
+            "errors": errors[:10]
+        })
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)})
+
+
 # ─── Debug ────────────────────────────────────────────────────────────────────
 
 @app.get("/admin/debug", response_class=HTMLResponse)
