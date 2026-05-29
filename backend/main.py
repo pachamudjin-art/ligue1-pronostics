@@ -319,6 +319,53 @@ async def journee(request: Request, season_id: int, number: int):
             if len(rows2) < len(open_match_ids):
                 missing_pronostics.append(u["username"])
 
+    # ── Classement de la journée ──
+    finished_matches = [m for m in matches if m["home_score"] is not None and m["away_score"] is not None]
+    matchday_ranking = []
+    if finished_matches:
+        finished_ids = [m["id"] for m in finished_matches]
+        ph = ",".join(["%s"] * len(finished_ids))
+        for u in all_users:
+            # Pronostics sur les matchs terminés
+            u_pronos = qall(conn,
+                f"SELECT p.*, m.home_score as real_h, m.away_score as real_a FROM pronostics p "
+                f"JOIN matches m ON m.id=p.match_id "
+                f"WHERE p.user_id=%s AND p.match_id IN ({ph})",
+                [u["id"]] + finished_ids)
+            prono_data = [{"pred_home": r["home_score"], "pred_away": r["away_score"],
+                           "real_home": r["real_h"], "real_away": r["real_a"]} for r in u_pronos]
+            stats = compute_matchday_stats(prono_data)
+
+            # Estimation
+            est = qone(conn, "SELECT estimated_score FROM score_estimates WHERE user_id=%s AND matchday_id=%s",
+                      (u["id"], matchday["id"]))
+            est_pts = 0
+            if est and stats["points"] > 0:
+                est_pts = compute_estimate_points(stats["points"], est["estimated_score"])
+
+            matchday_ranking.append({
+                "username": u["username"],
+                "points": stats["points"] + est_pts,
+                "pts_bruts": stats["points"],
+                "est_pts": est_pts,
+                "pj": stats["pj"], "pp": stats["pp"],
+                "pa": stats["pa"], "bb": stats["bb"],
+                "estimation": est["estimated_score"] if est else None,
+                "nb_pronos": len(u_pronos),
+                "nb_matchs": len(finished_matches),
+            })
+        matchday_ranking.sort(key=lambda x: (-x["points"], -x["pj"], -x["pp"], -x["pa"]))
+        # Ajouter le rang
+        for i, p in enumerate(matchday_ranking):
+            if i > 0:
+                prev = matchday_ranking[i-1]
+                if p["points"] == prev["points"] and p["pj"] == prev["pj"] and p["pp"] == prev["pp"] and p["pa"] == prev["pa"]:
+                    p["rank"] = prev["rank"]
+                else:
+                    p["rank"] = i + 1
+            else:
+                p["rank"] = 1
+
     all_seasons = get_all_seasons()
     release_db(conn)
 
@@ -336,6 +383,8 @@ async def journee(request: Request, season_id: int, number: int):
         "now_utc": utcnow_str(),
         "read_only": read_only,
         "missing_pronostics": missing_pronostics,
+        "matchday_ranking": matchday_ranking,
+        "nb_finished": len(finished_matches),
     })
 
 @app.get("/journee/{number}", response_class=HTMLResponse)
