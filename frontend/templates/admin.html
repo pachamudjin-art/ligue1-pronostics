@@ -38,15 +38,45 @@
       </tbody>
     </table>
 
-    <!-- Créer une nouvelle saison -->
+    <!-- Créer une nouvelle compétition -->
     <div style="border-top:1px solid var(--border); padding-top:.85rem; margin-top:.5rem;">
-      <div style="font-size:.8rem; color:var(--muted); margin-bottom:.5rem;">Créer une nouvelle saison :</div>
-      <form method="post" action="/admin/season/create" style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
-        <label style="font-size:.85rem; color:var(--muted);">Année de début :</label>
-        <input type="number" name="year_start" class="admin-in" style="width:5rem;"
-               value="{{ all_seasons[0].year_start + 1 if all_seasons else 2026 }}" min="2020" max="2050" required>
-        <button type="submit" class="btn btn-primary btn-sm">Créer</button>
-        <span style="font-size:.78rem; color:var(--muted);">(ex: 2026 → crée "Ligue 1 2026/2027")</span>
+      <div style="font-size:.8rem; color:var(--muted); margin-bottom:.6rem;">Créer une nouvelle compétition :</div>
+      <form method="post" action="/admin/season/create">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:.5rem; margin-bottom:.6rem;">
+          <div>
+            <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.2rem;">Nom (optionnel)</label>
+            <input type="text" name="competition_name" class="admin-in" placeholder="ex: Coupe du Monde 2026">
+          </div>
+          <div>
+            <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.2rem;">Type</label>
+            <select name="competition_type" class="admin-in" onchange="updateApiCode(this)">
+              <option value="league">Championnat (Ligue 1...)</option>
+              <option value="cup">Compétition internationale (CM, CL...)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.2rem;">Année de début</label>
+            <input type="number" name="year_start" class="admin-in"
+                   value="{{ all_seasons[0].year_start + 1 if all_seasons else 2026 }}" min="2020" max="2060" required>
+          </div>
+          <div>
+            <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.2rem;">Code API football-data</label>
+            <select name="api_code" class="admin-in">
+              <option value="FL1">FL1 — Ligue 1</option>
+              <option value="WC">WC — Coupe du Monde FIFA</option>
+              <option value="CL">CL — Champions League</option>
+              <option value="PL">PL — Premier League</option>
+              <option value="BL1">BL1 — Bundesliga</option>
+              <option value="SA">SA — Serie A</option>
+              <option value="PD">PD — La Liga</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.75rem; color:var(--muted); display:block; margin-bottom:.2rem;">Nombre de journées/phases</label>
+            <input type="number" name="nb_journees" class="admin-in" value="34" min="1" max="100" required>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Créer la compétition</button>
       </form>
     </div>
   </div>
@@ -99,6 +129,9 @@
             <div style="display:flex; gap:.4rem; flex-wrap:wrap;">
               <a href="/admin/journee/{{ md.number }}" class="btn btn-secondary btn-sm">Gérer</a>
               <a href="/saison/{{ season.id }}/journee/{{ md.number }}" class="btn btn-secondary btn-sm">Voir</a>
+            {% if season and season.competition_type == 'cup' %}
+            <a href="/saison/{{ season.id }}/podium" class="btn btn-secondary btn-sm">🏅 Podium</a>
+            {% endif %}
             </div>
           </td>
         </tr>

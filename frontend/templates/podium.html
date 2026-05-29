@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}Pronostic Podium — {{ season.name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:800px;">
+
+  <!-- Sélecteur de saison -->
+  {% if all_seasons|length > 1 %}
+  <div style="display:flex; align-items:center; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap;">
+    <span style="font-size:.8rem; color:var(--muted);">Compétition :</span>
+    {% for s in all_seasons %}
+    <a href="/saison/{{ s.id }}/podium"
+       class="btn btn-sm {% if s.id == season.id %}btn-primary{% else %}btn-secondary{% endif %}">
+      {{ s.name }}{% if s.is_active %} ★{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <h1>🏅 Pronostic Podium</h1>
+  <p style="color:var(--muted); font-size:.88rem; margin-bottom:1.5rem;">{{ season.name }}</p>
+
+  <!-- Mon pronostic -->
+  <div class="card" style="margin-bottom:1.2rem;">
+    <h2 style="margin-bottom:.85rem;">🎯 Mon pronostic podium</h2>
+
+    {% if locked %}
+      <!-- Verrouillé -->
+      {% if my_prono %}
+      <div style="display:flex; flex-direction:column; gap:.5rem;">
+        {% for place, team in [('🥇 1er', my_prono.rank1), ('🥈 2ème', my_prono.rank2), ('🥉 3ème', my_prono.rank3)] %}
+        <div style="display:flex; align-items:center; gap:.75rem; background:var(--surface2);
+                    border:1px solid var(--border); border-radius:8px; padding:.5rem .85rem;">
+          <span style="font-size:.9rem; min-width:4rem; color:var(--muted);">{{ place }}</span>
+          <span style="font-weight:600;">{{ team }}</span>
+          {% if podium_result %}
+            {% set real = [podium_result.rank1, podium_result.rank2, podium_result.rank3] %}
+            {% if loop.index == 1 and team == podium_result.rank1 %}
+              <span style="margin-left:auto; color:var(--accent); font-weight:700;">+10 pts 🏆</span>
+            {% elif loop.index == 2 and team == podium_result.rank2 %}
+              <span style="margin-left:auto; color:var(--green);">+5 pts ✓</span>
+            {% elif loop.index == 3 and team == podium_result.rank3 %}
+              <span style="margin-left:auto; color:var(--green);">+5 pts ✓</span>
+            {% elif team in real %}
+              <span style="margin-left:auto; color:#f39c12;">+3 pts</span>
+            {% else %}
+              <span style="margin-left:auto; color:var(--muted);">0 pt</span>
+            {% endif %}
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        <p style="color:var(--muted);">Vous n'avez pas saisi de pronostic podium.</p>
+      {% endif %}
+      <div style="margin-top:.75rem;">
+        <span class="badge badge-lock">Pronostic verrouillé</span>
+      </div>
+
+    {% else %}
+      <!-- Formulaire -->
+      <form id="podium-form" onsubmit="submitPodium(event, {{ season.id }})">
+        <div style="display:flex; flex-direction:column; gap:.6rem; margin-bottom:.85rem;">
+          {% for place, field, current in [
+            ('🥇 Vainqueur', 'rank1', my_prono.rank1 if my_prono else ''),
+            ('🥈 Finaliste', 'rank2', my_prono.rank2 if my_prono else ''),
+            ('🥉 3ème place', 'rank3', my_prono.rank3 if my_prono else '')
+          ] %}
+          <div style="display:flex; align-items:center; gap:.75rem; flex-wrap:wrap;">
+            <span style="font-size:.9rem; min-width:6rem; color:var(--muted);">{{ place }}</span>
+            {% if teams %}
+            <select name="{{ field }}" class="admin-in" style="flex:1; min-width:150px;" required>
+              <option value="">-- Choisir une équipe --</option>
+              {% for t in teams %}
+              <option value="{{ t }}" {% if t == current %}selected{% endif %}>{{ t }}</option>
+              {% endfor %}
+            </select>
+            {% else %}
+            <input type="text" name="{{ field }}" class="admin-in" style="flex:1;"
+                   value="{{ current }}" placeholder="Nom de l'équipe" required>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary">
+          {% if my_prono %}Modifier mon pronostic{% else %}Valider mon pronostic{% endif %}
+        </button>
+        {% if not teams %}
+        <p style="font-size:.75rem; color:var(--muted); margin-top:.5rem;">
+          La liste des équipes sera disponible une fois l'API configurée.
+        </p>
+        {% endif %}
+      </form>
+    {% endif %}
+  </div>
+
+  <!-- Résultat officiel (admin) -->
+  {% if user.is_admin %}
+  <div class="card" style="margin-bottom:1.2rem;">
+    <h2 style="margin-bottom:.75rem;">⚙ Saisir le podium officiel</h2>
+    <form method="post" action="/admin/podium/set-result"
+          style="display:flex; flex-direction:column; gap:.5rem;">
+      <input type="hidden" name="season_id" value="{{ season.id }}">
+      {% for label, field, current in [
+        ('🥇 Vainqueur', 'rank1', podium_result.rank1 if podium_result else ''),
+        ('🥈 Finaliste', 'rank2', podium_result.rank2 if podium_result else ''),
+        ('🥉 3ème place', 'rank3', podium_result.rank3 if podium_result else '')
+      ] %}
+      <div style="display:flex; align-items:center; gap:.75rem;">
+        <span style="min-width:7rem; font-size:.85rem; color:var(--muted);">{{ label }}</span>
+        <input type="text" name="{{ field }}" class="admin-in" style="flex:1;"
+               value="{{ current }}" placeholder="Équipe" required>
+      </div>
+      {% endfor %}
+      <button type="submit" class="btn btn-primary btn-sm" style="align-self:flex-start; margin-top:.25rem;">
+        Enregistrer le podium
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Classement podium -->
+  {% if podium_result %}
+  <div class="card" style="margin-bottom:1.2rem;">
+    <h2 style="margin-bottom:.75rem;">🏆 Podium officiel</h2>
+    <div style="display:flex; gap:.75rem; flex-wrap:wrap; margin-bottom:1rem;">
+      {% for place, team in [('🥇', podium_result.rank1), ('🥈', podium_result.rank2), ('🥉', podium_result.rank3)] %}
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+                  padding:.5rem 1rem; font-weight:600;">
+        {{ place }} {{ team }}
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if podium_scores %}
+    <table class="ranking-table">
+      <thead>
+        <tr>
+          <th style="width:2.5rem; text-align:center;">#</th>
+          <th>Joueur</th>
+          <th style="text-align:right;">Pts podium</th>
+          <th>Détail</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in podium_scores %}
+        <tr {% if p.username == user.username %}style="background:rgba(232,196,90,.06);"{% endif %}>
+          <td style="text-align:center; color:var(--muted);">{{ loop.index }}</td>
+          <td style="font-weight:{% if p.username == user.username %}600{% else %}400{% endif %};">
+            {{ p.username }}
+          </td>
+          <td class="pts-cell" style="text-align:right;">{{ p.points }}</td>
+          <td style="font-size:.78rem; color:var(--muted);">
+            {% for d in p.detail %}
+              {{ d.team }}
+              {% if d.points == 10 %}<span style="color:var(--accent)">+10</span>
+              {% elif d.points == 5 %}<span style="color:var(--green)">+5</span>
+              {% elif d.points == 3 %}<span style="color:#f39c12">+3</span>
+              {% else %}<span style="color:#e74c3c">+0</span>{% endif %}
+              {% if not loop.last %} · {% endif %}
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Pronostics de tous (visibles si verrouillé) -->
+  {% if locked and all_pronos %}
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div style="padding:.75rem 1rem; background:var(--surface2); border-bottom:1px solid var(--border);">
+      <span style="font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:.05em;">
+        Pronostics de tous les joueurs
+      </span>
+    </div>
+    <table class="ranking-table">
+      <thead>
+        <tr>
+          <th>Joueur</th>
+          <th>🥇 Vainqueur</th>
+          <th>🥈 Finaliste</th>
+          <th>🥉 3ème</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in all_pronos %}
+        <tr {% if p.username == user.username %}style="background:rgba(232,196,90,.06);"{% endif %}>
+          <td style="font-weight:600;">{{ p.username }}</td>
+          <td>{{ p.rank1 }}</td>
+          <td>{{ p.rank2 }}</td>
+          <td>{{ p.rank3 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif not locked %}
+  <div style="font-size:.8rem; color:var(--muted); text-align:center; margin-top:1rem;">
+    Les pronostics des autres joueurs seront visibles au coup d'envoi du premier match.
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function submitPodium(e, seasonId) {
+  e.preventDefault();
+  const form = document.getElementById("podium-form");
+  const fd = new FormData(form);
+  fd.append("season_id", seasonId);
+  // Vérifier pas de doublons
+  const vals = [fd.get("rank1"), fd.get("rank2"), fd.get("rank3")];
+  if (new Set(vals).size < 3) {
+    toast("Vous ne pouvez pas pronostiquer la même équipe deux fois !", "err");
+    return;
+  }
+  try {
+    const res = await fetch("/podium/submit", {method:"POST", body:fd});
+    const data = await res.json();
+    if (data.ok) {
+      toast("✓ Pronostic podium enregistré !", "ok");
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      toast(data.error || "Erreur", "err");
+    }
+  } catch(e) {
+    toast("Erreur réseau", "err");
+  }
+}
+</script>
+{% endblock %}
