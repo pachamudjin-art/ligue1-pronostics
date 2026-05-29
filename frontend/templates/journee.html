@@ -92,6 +92,62 @@
     <span style="font-size:.75rem; color:var(--muted); margin-left:auto">Bonus de 2 pts si estimation exacte</span>
   </div>
 
+  <!-- Classement de la journée -->
+  {% if matchday_ranking %}
+  <div class="card" style="margin-bottom:1.2rem; padding:0; overflow:hidden;">
+    <div style="padding:.75rem 1rem; background:var(--surface2); border-bottom:1px solid var(--border);
+                display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:.05em; color:var(--accent);">
+        🏆 Classement J{{ matchday.number }}
+      </span>
+      <span style="font-size:.75rem; color:var(--muted);">
+        {{ nb_finished }}/{{ matches|length }} match{{ 'es' if nb_finished != 1 else '' }} terminé{{ 's' if nb_finished != 1 else '' }}
+      </span>
+    </div>
+    <table class="ranking-table">
+      <thead>
+        <tr>
+          <th style="width:2rem; text-align:center;">#</th>
+          <th>Joueur</th>
+          <th style="text-align:right;">Pts</th>
+          <th style="text-align:center;" title="Pronostics Justes">PJ</th>
+          <th style="text-align:center;" title="Pronostics Parfaits">PP</th>
+          <th style="text-align:center;" title="Pronostics Approchants">PA</th>
+          <th style="text-align:center;" title="Bonus But">BB</th>
+          <th style="text-align:center;" title="Estimation">Est.</th>
+          <th style="text-align:center;" title="Pronostics saisis">✓</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in matchday_ranking %}
+        <tr class="rank-{{ p.rank }}" {% if p.username == user.username %}style="background:rgba(232,196,90,.06);"{% endif %}>
+          <td class="rank-num" style="font-size:1rem;">
+            {% if p.rank == 1 %}🥇{% elif p.rank == 2 %}🥈{% elif p.rank == 3 %}🥉{% else %}{{ p.rank }}{% endif %}
+          </td>
+          <td style="font-weight:{% if p.username == user.username %}600{% else %}400{% endif %};">
+            {{ p.username }}{% if p.username == user.username %} <span style="color:var(--muted);font-size:.7rem;">← moi</span>{% endif %}
+          </td>
+          <td class="pts-cell" style="text-align:right;">
+            {{ p.points }}
+            {% if p.est_pts > 0 %}<span style="font-size:.7rem; color:var(--green); margin-left:.2rem">+{{ p.est_pts }}est</span>{% endif %}
+          </td>
+          <td style="text-align:center; color:var(--muted);">{{ p.pj }}</td>
+          <td style="text-align:center; color:var(--muted);">{{ p.pp }}</td>
+          <td style="text-align:center; color:var(--muted);">{{ p.pa }}</td>
+          <td style="text-align:center;">{% if p.bb > 0 %}<span style="color:#9b59b6;">{{ p.bb }}</span>{% else %}—{% endif %}</td>
+          <td style="text-align:center; font-size:.8rem; color:var(--muted);">
+            {% if p.estimation is not none %}{{ p.estimation }}{% else %}—{% endif %}
+          </td>
+          <td style="text-align:center; font-size:.75rem; color:var(--muted);">
+            {{ p.nb_pronos }}/{{ p.nb_matchs }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
   <!-- Liste des matchs -->
   {% if matches %}
     {% for m in matches %}
