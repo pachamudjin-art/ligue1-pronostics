@@ -202,3 +202,280 @@ function initCountdowns() {
 }
 
 document.addEventListener("DOMContentLoaded", initCountdowns);
+
+
+// ══════════════════════════════════════════════════════════════
+// Chat flottant
+// ══════════════════════════════════════════════════════════════
+
+let chatLastId = 0;
+let chatOpen = false;
+let chatUnread = 0;
+let chatPollTimer = null;
+let gifDebounce = null;
+
+function initFloatingChat() {
+  loadChatHistory();
+  startChatPolling();
+}
+
+// ── Ouvrir / fermer le panneau ───────────────────────────────
+function toggleChat() {
+  chatOpen = !chatOpen;
+  const panel = document.getElementById("chat-panel");
+  const fab   = document.getElementById("chat-fab");
+  const overlay = document.getElementById("chat-overlay");
+
+  panel.classList.toggle("open", chatOpen);
+  fab.classList.toggle("open", chatOpen);
+  overlay.classList.toggle("open", chatOpen);
+
+  if (chatOpen) {
+    chatUnread = 0;
+    updateNotifBadge();
+    setTimeout(() => {
+      const box = document.getElementById("chat-box");
+      if (box) box.scrollTop = box.scrollHeight;
+      document.getElementById("chat-input")?.focus();
+    }, 320);
+    closeEmojiPicker();
+    closeGifPicker();
+  }
+}
+
+// ── Badge notifications ──────────────────────────────────────
+function updateNotifBadge() {
+  const badge = document.getElementById("chat-notif");
+  if (!badge) return;
+  if (chatUnread > 0 && !chatOpen) {
+    badge.textContent = chatUnread > 9 ? "9+" : chatUnread;
+    badge.style.display = "flex";
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+// ── Charger l'historique ─────────────────────────────────────
+async function loadChatHistory() {
+  try {
+    const res = await fetch("/chat/messages?after_id=0");
+    const data = await res.json();
+    if (data.ok && data.messages.length > 0) {
+      const box = document.getElementById("chat-box");
+      if (!box) return;
+      box.innerHTML = "";
+      data.messages.forEach(msg => box.appendChild(renderChatMsg(msg)));
+      chatLastId = data.messages[data.messages.length - 1].id;
+      box.scrollTop = box.scrollHeight;
+    }
+  } catch(e) {}
+}
+
+// ── Polling toutes les 15s ───────────────────────────────────
+function startChatPolling() {
+  chatPollTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`/chat/messages?after_id=${chatLastId}`);
+      const data = await res.json();
+      if (data.ok && data.messages.length > 0) {
+        const box = document.getElementById("chat-box");
+        if (!box) return;
+        const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+        data.messages.forEach(msg => {
+          if (!box.querySelector(`[data-id="${msg.id}"]`)) {
+            box.appendChild(renderChatMsg(msg));
+            chatLastId = msg.id;
+            if (!chatOpen && msg.username !== window.CHAT_USER) {
+              chatUnread++;
+              updateNotifBadge();
+            }
+          }
+        });
+        if (atBottom || chatOpen) box.scrollTop = box.scrollHeight;
+      }
+    } catch(e) {}
+  }, 15000);
+}
+
+// ── Rendre un message ────────────────────────────────────────
+function renderChatMsg(msg) {
+  const isMine = msg.username === window.CHAT_USER;
+  const canDel = isMine || window.CHAT_IS_ADMIN;
+
+  const d = new Date(msg.created_at.replace(" ", "T") + "Z");
+  const timeStr = d.toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"});
+
+  // Détecter si c'est un GIF (message spécial [GIF:url])
+  const gifMatch = msg.message.match(/^\[GIF:(https?:\/\/[^\]]+)\]$/);
+
+  const div = document.createElement("div");
+  div.className = "chat-msg" + (isMine ? " mine" : "");
+  div.dataset.id = msg.id;
+
+  const contentHtml = gifMatch
+    ? `<img class="chat-gif" src="${escHtml(gifMatch[1])}" alt="GIF" loading="lazy">`
+    : escHtml(msg.message);
+
+  div.innerHTML = `
+    <div class="chat-bubble">
+      <div class="chat-meta">
+        <span class="chat-author">${escHtml(msg.username)}</span>
+        <span class="chat-time">${timeStr}</span>
+        ${canDel ? `<button class="chat-del-btn" onclick="deleteChatMsg(${msg.id},this)">✕</button>` : ""}
+      </div>
+      <div class="chat-text">${contentHtml}</div>
+    </div>`;
+  return div;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+}
+
+// ── Envoyer un message ───────────────────────────────────────
+async function sendChatMsg() {
+  const input = document.getElementById("chat-input");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  input.focus();
+  closeEmojiPicker();
+
+  const fd = new FormData();
+  fd.append("message", text);
+  try {
+    const res = await fetch("/chat/send", {method:"POST", body:fd});
+    const data = await res.json();
+    if (data.ok) {
+      const box = document.getElementById("chat-box");
+      box.appendChild(renderChatMsg(data.message));
+      chatLastId = data.message.id;
+      box.scrollTop = box.scrollHeight;
+    } else {
+      toast(data.error || "Erreur envoi", "err");
+    }
+  } catch(e) {
+    toast("Erreur réseau", "err");
+  }
+}
+
+// ── Supprimer un message ─────────────────────────────────────
+async function deleteChatMsg(msgId, btn) {
+  if (!confirm("Supprimer ce message ?")) return;
+  const fd = new FormData();
+  fd.append("message_id", msgId);
+  const res = await fetch("/chat/delete", {method:"POST", body:fd});
+  const data = await res.json();
+  if (data.ok) {
+    document.getElementById("chat-box")?.querySelector(`[data-id="${msgId}"]`)?.remove();
+  }
+}
+
+// ── Émojis ───────────────────────────────────────────────────
+function toggleEmojiPicker() {
+  const picker = document.getElementById("emoji-picker");
+  const gifPicker = document.getElementById("gif-picker");
+  const btn = document.querySelector('.chat-tool-btn[onclick="toggleEmojiPicker()"]');
+  const isOpen = picker.style.display !== "none";
+  gifPicker.style.display = "none";
+  document.querySelector('.chat-tool-btn[onclick="toggleGifPicker()"]')?.classList.remove("active");
+  picker.style.display = isOpen ? "none" : "block";
+  btn?.classList.toggle("active", !isOpen);
+}
+
+function closeEmojiPicker() {
+  document.getElementById("emoji-picker").style.display = "none";
+  document.querySelector('.chat-tool-btn[onclick="toggleEmojiPicker()"]')?.classList.remove("active");
+}
+
+function insertEmoji(emoji) {
+  const input = document.getElementById("chat-input");
+  const pos = input.selectionStart;
+  input.value = input.value.slice(0, pos) + emoji + input.value.slice(pos);
+  input.selectionStart = input.selectionEnd = pos + emoji.length;
+  input.focus();
+}
+
+// ── GIFs ─────────────────────────────────────────────────────
+function toggleGifPicker() {
+  const picker = document.getElementById("gif-picker");
+  const emojiPicker = document.getElementById("emoji-picker");
+  const btn = document.querySelector('.chat-tool-btn[onclick="toggleGifPicker()"]');
+  const isOpen = picker.style.display !== "none";
+  emojiPicker.style.display = "none";
+  document.querySelector('.chat-tool-btn[onclick="toggleEmojiPicker()"]')?.classList.remove("active");
+  picker.style.display = isOpen ? "none" : "flex";
+  btn?.classList.toggle("active", !isOpen);
+  if (!isOpen) {
+    document.getElementById("gif-search")?.focus();
+    loadTrendingGifs();
+  }
+}
+
+function closeGifPicker() {
+  document.getElementById("gif-picker").style.display = "none";
+  document.querySelector('.chat-tool-btn[onclick="toggleGifPicker()"]')?.classList.remove("active");
+}
+
+async function loadTrendingGifs() {
+  const results = document.getElementById("gif-results");
+  results.innerHTML = '<span style="color:var(--muted);font-size:.8rem;padding:.5rem">Chargement…</span>';
+  try {
+    const res = await fetch("/giphy/trending");
+    const data = await res.json();
+    displayGifs(data.data);
+  } catch(e) {
+    results.innerHTML = '<span style="color:var(--muted);font-size:.8rem;padding:.5rem">Erreur GIPHY — vérifiez la clé API</span>';
+  }
+}
+
+function searchGifs(query) {
+  clearTimeout(gifDebounce);
+  if (!query.trim()) { loadTrendingGifs(); return; }
+  gifDebounce = setTimeout(async () => {
+    const results = document.getElementById("gif-results");
+    results.innerHTML = '<span style="color:var(--muted);font-size:.8rem;padding:.5rem">Recherche…</span>';
+    try {
+      const res = await fetch(`/giphy/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      displayGifs(data.data);
+    } catch(e) {}
+  }, 400);
+}
+
+function displayGifs(gifs) {
+  const results = document.getElementById("gif-results");
+  if (!gifs || gifs.length === 0) {
+    results.innerHTML = '<span style="color:var(--muted);font-size:.8rem;padding:.5rem">Aucun GIF trouvé</span>';
+    return;
+  }
+  results.innerHTML = "";
+  gifs.forEach(gif => {
+    const img = document.createElement("img");
+    img.className = "gif-thumb";
+    img.src = gif.images.fixed_width_small.url;
+    img.alt = gif.title;
+    img.loading = "lazy";
+    img.onclick = () => sendGif(gif.images.original.url);
+    results.appendChild(img);
+  });
+}
+
+async function sendGif(url) {
+  closeGifPicker();
+  const fd = new FormData();
+  fd.append("message", `[GIF:${url}]`);
+  try {
+    const res = await fetch("/chat/send", {method:"POST", body:fd});
+    const data = await res.json();
+    if (data.ok) {
+      const box = document.getElementById("chat-box");
+      box.appendChild(renderChatMsg(data.message));
+      chatLastId = data.message.id;
+      box.scrollTop = box.scrollHeight;
+    }
+  } catch(e) {
+    toast("Erreur envoi GIF", "err");
+  }
+}
