@@ -127,10 +127,7 @@
           <td style="font-weight:{% if p.username == user.username %}600{% else %}400{% endif %};">
             {{ p.username }}{% if p.username == user.username %} <span style="color:var(--muted);font-size:.7rem;">← moi</span>{% endif %}
           </td>
-          <td class="pts-cell" style="text-align:right;">
-            {{ p.points }}
-            {% if p.est_pts > 0 %}<span style="font-size:.7rem; color:var(--green); margin-left:.2rem">+{{ p.est_pts }}est</span>{% endif %}
-          </td>
+          <td class="pts-cell" style="text-align:right;">{{ p.points }}</td>
           <td style="text-align:center; color:var(--muted);">{{ p.pj }}</td>
           <td style="text-align:center; color:var(--muted);">{{ p.pp }}</td>
           <td style="text-align:center; color:var(--muted);">{{ p.pa }}</td>
