@@ -9,13 +9,24 @@
       {% if matchday.number > 1 %}
       <a href="/admin/journee/{{ matchday.number - 1 }}" class="btn btn-secondary btn-sm">← J{{ matchday.number - 1 }}</a>
       {% endif %}
-      {% if matchday.number < 34 %}
-      <a href="/admin/journee/{{ matchday.number + 1 }}" class="btn btn-secondary btn-sm">J{{ matchday.number + 1 }} →</a>
-      {% endif %}
+      <a href="/admin/journee/{{ matchday.number + 1 }}" class="btn btn-secondary btn-sm">Phase suivante →</a>
     </div>
   </div>
 
-  <h1>⚙ Journée {{ matchday.number }}</h1>
+  <h1>⚙ {{ matchday.label or 'Journée ' ~ matchday.number }}</h1>
+
+  <!-- Renommer la phase -->
+  <div class="card" style="margin-bottom:1rem; padding:.75rem 1rem;">
+    <form method="post" action="/admin/matchday/rename"
+          style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
+      <input type="hidden" name="matchday_id" value="{{ matchday.id }}">
+      <label style="font-size:.8rem; color:var(--muted); white-space:nowrap;">Nom de la phase :</label>
+      <input type="text" name="label" class="admin-in" style="flex:1; min-width:180px;"
+             value="{{ matchday.label or 'Journée ' ~ matchday.number }}"
+             placeholder="ex: Phase de groupe J1, Quarts de finale...">
+      <button type="submit" class="btn btn-secondary btn-sm">Renommer</button>
+    </form>
+  </div>
 
   <!-- Import API -->
   <div class="card" style="margin-bottom:1.2rem;">

@@ -34,7 +34,7 @@
 
     <select onchange="goToJournee(this, {{ season.id }})">
       {% for jn in all_matchdays %}
-      <option value="{{ jn }}" {% if jn == matchday.number %}selected{% endif %}>Journée {{ jn }}</option>
+      <option value="{{ jn }}" {% if jn == matchday.number %}selected{% endif %}>{{ all_matchday_labels[jn] if all_matchday_labels is defined and jn in all_matchday_labels else "Journée " ~ jn }}</option>
       {% endfor %}
     </select>
 
@@ -44,7 +44,7 @@
     <a href="/saison/{{ season.id }}/classement" class="btn btn-secondary btn-sm" style="margin-left:auto">🏆 Classement</a>
   </div>
 
-  <h1>Journée {{ matchday.number }}</h1>
+  <h1>{{ matchday.label or "Journée " ~ matchday.number }}</h1>
 
   <!-- Joueurs sans pronostic -->
   {% if missing_pronostics and not read_only %}
