@@ -712,6 +712,7 @@ async def chat_send(request: Request, message: str = Form(...)):
     c = conn.cursor()
     c.execute("INSERT INTO chat_messages (user_id, message) VALUES (%s, %s) RETURNING id", (user["id"], message))
     new_id = c.fetchone()["id"]
+    conn.commit()
     row = qone(conn, """
         SELECT cm.id, cm.message, cm.created_at, u.username
         FROM chat_messages cm JOIN users u ON u.id=cm.user_id WHERE cm.id=%s
@@ -765,6 +766,84 @@ async def giphy_search(request: Request, q_param: str = ""):
             return JSONResponse(_j.loads(r.read()))
     except Exception as e:
         return JSONResponse({"data": [], "error": str(e)})
+
+
+# ─── Hall of Fame ────────────────────────────────────────────────────────────
+
+HALL_OF_FAME = {
+    "champions": [
+        {"num": 1,  "saison": "2010-2011", "joueur": "Ricardo",  "points": 412},
+        {"num": 2,  "saison": "2011-2012", "joueur": "Ricardo",  "points": 578},
+        {"num": 3,  "saison": "2012-2013", "joueur": "Seb",      "points": 562},
+        {"num": 4,  "saison": "2013-2014", "joueur": "Coach",    "points": 582},
+        {"num": 5,  "saison": "2014-2015", "joueur": "Seb",      "points": 632},
+        {"num": 6,  "saison": "2015-2016", "joueur": "Mathieu",  "points": 554},
+        {"num": 7,  "saison": "2016-2017", "joueur": "Mathieu",  "points": 645},
+        {"num": 8,  "saison": "2017-2018", "joueur": "Mathieu",  "points": 587},
+        {"num": 9,  "saison": "2018-2019", "joueur": "Ricardo",  "points": 529},
+        {"num": 10, "saison": "2019-2020", "joueur": "Mathieu",  "points": 447},
+        {"num": 11, "saison": "2020-2021", "joueur": "Ricardo",  "points": 546},
+        {"num": 12, "saison": "2021-2022", "joueur": "Ricardo",  "points": 595},
+        {"num": 13, "saison": "2022-2023", "joueur": "Seb",      "points": 602},
+        {"num": 14, "saison": "2023-2024", "joueur": "Ben",      "points": 450},
+        {"num": 15, "saison": "2024-2025", "joueur": "Seb",      "points": None},
+        {"num": 16, "saison": "2025-2026", "joueur": "Seb",      "points": None},
+    ],
+    "cuilleres": [
+        {"num": 1,  "saison": "2010-2011", "joueur": "Seb",      "points": 388},
+        {"num": 2,  "saison": "2011-2012", "joueur": "Dreux",    "points": 473},
+        {"num": 3,  "saison": "2012-2013", "joueur": "Dreux",    "points": 498},
+        {"num": 4,  "saison": "2013-2014", "joueur": "Dreux",    "points": 492},
+        {"num": 5,  "saison": "2014-2015", "joueur": "Dreux",    "points": 492},
+        {"num": 6,  "saison": "2015-2016", "joueur": "Coach",    "points": 478},
+        {"num": 7,  "saison": "2016-2017", "joueur": "Dreux",    "points": 458},
+        {"num": 8,  "saison": "2017-2018", "joueur": "Le Doubs", "points": 478},
+        {"num": 9,  "saison": "2018-2019", "joueur": "Greg",     "points": 469},
+        {"num": 10, "saison": "2019-2020", "joueur": "Le Doubs", "points": 329},
+        {"num": 11, "saison": "2020-2021", "joueur": "Le Doubs", "points": 479},
+        {"num": 12, "saison": "2021-2022", "joueur": "Dreux",    "points": 483},
+        {"num": 13, "saison": "2022-2023", "joueur": "Le Doubs", "points": 515},
+        {"num": 14, "saison": "2023-2024", "joueur": "Le Doubs", "points": 341},
+        {"num": 15, "saison": "2024-2025", "joueur": "Le Doubs", "points": None},
+        {"num": 16, "saison": "2025-2026", "joueur": "Coach",    "points": None},
+    ],
+}
+
+@app.get("/hall-of-fame", response_class=HTMLResponse)
+async def hall_of_fame(request: Request):
+    user = get_current_user(request)
+    if not user: return RedirectResponse("/login", status_code=303)
+    season = get_active_season()
+
+    from collections import Counter
+    champ_count = Counter(c["joueur"] for c in HALL_OF_FAME["champions"])
+    cuil_count  = Counter(c["joueur"] for c in HALL_OF_FAME["cuilleres"])
+
+    return templates.TemplateResponse("hall_of_fame.html", {
+        "request": request, "user": user, "season": season,
+        "champions": list(reversed(HALL_OF_FAME["champions"])),
+        "cuilleres": list(reversed(HALL_OF_FAME["cuilleres"])),
+        "champ_count": dict(sorted(champ_count.items(), key=lambda x: -x[1])),
+        "cuil_count":  dict(sorted(cuil_count.items(),  key=lambda x: -x[1])),
+    })
+
+@app.post("/admin/hall-of-fame/add")
+async def admin_add_hof(
+    request: Request,
+    type: str = Form(...),
+    saison: str = Form(...),
+    joueur: str = Form(...),
+    points: str = Form(""),
+):
+    require_admin(request)
+    entry = {
+        "num": len(HALL_OF_FAME[type]) + 1,
+        "saison": saison,
+        "joueur": joueur,
+        "points": int(points) if points.strip() else None,
+    }
+    HALL_OF_FAME[type].append(entry)
+    return RedirectResponse("/hall-of-fame", status_code=303)
 
 
 # ─── Import ODS ──────────────────────────────────────────────────────────────
