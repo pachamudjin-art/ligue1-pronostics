@@ -25,7 +25,19 @@ app = FastAPI(title="Ligue 1 Pronostics")
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "db_url_set": bool(os.environ.get("DATABASE_URL"))}
+    import os
+    db_url = os.environ.get("DATABASE_URL", "")
+    db_test = "non testé"
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT 1 as ok")
+        row = c.fetchone()
+        conn.close()
+        db_test = "OK" if row else "pas de réponse"
+    except Exception as e:
+        db_test = f"ERREUR: {str(e)[:200]}"
+    return {"status": "ok", "db_url_set": bool(db_url), "db_test": db_test}
 
 app.add_middleware(
     SessionMiddleware,
