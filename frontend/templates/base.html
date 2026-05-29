@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/static/css/style.css">
   {% block head %}{% endblock %}
 </head>
-<body>
+<body data-theme="{{ user.theme if user and user.theme else 'ligue1' }}">
 
 {% if user %}
 <nav>

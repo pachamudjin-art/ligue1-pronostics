@@ -2,12 +2,53 @@
 {% block title %}Mon profil — L1 Pronostics{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:500px;">
+<div class="container" style="max-width:560px;">
   <h1>👤 Mon profil</h1>
-  <p style="color:var(--muted); margin-bottom:1.5rem;">Connecté en tant que <strong style="color:var(--accent)">{{ user.username }}</strong></p>
+  <p style="color:var(--muted); margin-bottom:1.5rem;">
+    Connecté en tant que <strong style="color:var(--accent)">{{ user.username }}</strong>
+  </p>
 
+  <!-- Sélecteur de thème -->
+  <div class="card" style="margin-bottom:1.2rem;">
+    <h2 style="margin-bottom:1rem;">🎨 Thème visuel</h2>
+    <form method="post" action="/profil/change-theme">
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:.6rem; margin-bottom:.85rem;">
+
+        {% set themes = [
+          ("ligue1",       "⚽ Ligue 1",      "#e8c45a", "#0d1117"),
+          ("nuit-bleue",   "🌊 Nuit Bleue",   "#60a5fa", "#0a0f1e"),
+          ("rouge-passion","🔥 Rouge Passion", "#f87171", "#0f0a0a"),
+          ("neon",         "✨ Néon",          "#a78bfa", "#050510"),
+          ("minimaliste",  "🤍 Minimaliste",  "#1e40af", "#f8fafc"),
+          ("glassmorphism","💎 Glassmorphism", "#38bdf8", "#0f172a"),
+        ] %}
+
+        {% for tid, tlabel, taccent, tbg in themes %}
+        <label style="cursor:pointer;">
+          <input type="radio" name="theme" value="{{ tid }}"
+                 {% if user.theme == tid %}checked{% endif %}
+                 style="display:none;" onchange="this.form.submit()">
+          <div style="background:{{ tbg }}; border:2px solid {% if user.theme == tid %}{{ taccent }}{% else %}#333{% endif %};
+                      border-radius:10px; padding:.75rem .5rem; text-align:center;
+                      transition:border-color .2s; position:relative;">
+            <div style="width:100%; height:6px; background:{{ taccent }};
+                        border-radius:3px; margin-bottom:.5rem;"></div>
+            <div style="font-size:.78rem; color:{{ taccent }}; font-weight:600;">{{ tlabel }}</div>
+            {% if user.theme == tid %}
+            <div style="position:absolute; top:.3rem; right:.4rem; color:{{ taccent }}; font-size:.8rem;">✓</div>
+            {% endif %}
+          </div>
+        </label>
+        {% endfor %}
+
+      </div>
+      <p style="font-size:.75rem; color:var(--muted);">Cliquez sur un thème pour l'appliquer immédiatement.</p>
+    </form>
+  </div>
+
+  <!-- Changement de mot de passe -->
   <div class="card">
-    <h2 style="margin-bottom:1rem;">Changer mon mot de passe</h2>
+    <h2 style="margin-bottom:1rem;">🔒 Changer mon mot de passe</h2>
 
     {% if error %}
     <div class="error-msg">{{ error }}</div>
