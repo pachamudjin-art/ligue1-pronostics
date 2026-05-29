@@ -1,142 +1,82 @@
 """
-Logique de calcul des points selon la formule LibreOffice.
+Logique de calcul des points.
 
-Légende :
-  BB = Bonus But     = 6 pts  (score exact, 4 buts ou plus)
-  PP = Parfait       = 4 pts  (score exact, moins de 4 buts)
-  PA = Approchant    = 3 pts  (bonne issue + écart de buts proche + total de buts proche)
-  PJ = Juste         = 2 pts  (bonne issue uniquement)
-       Mauvais       = 0 pts
+BB = 6 pts  : score exact, 4 buts ou plus
+PP = 4 pts  : score exact, moins de 4 buts
+PA = 3 pts  : bonne issue + écart de buts proche (±1) + total de buts proche (±2)
+PJ = 2 pts  : bonne issue uniquement
+   = 0 pts  : mauvaise issue
 
-Formule LibreOffice traduite :
-=SI(NB.VIDE(V26:W26)=2; 0;
-  SI(ET(D33=V26; E33=W26; (D33+E33)>=4); 6;
-  SI(ET(D33=V26; E33=W26; D33+E33<4); 4;
-  SI(ET(
-       ET(ABS(D33-E33)-ABS(V26-W26)<=1; (ABS(D33-E33)-ABS(V26-W26))>=-1);
-       ABS((D33+E33)-(V26+W26))<=2;
-       OU(ET(D33>E33;V26>W26); ET(D33<E33;V26<W26); ET(D33=E33;V26=W26;D33+V26=E33+W26))
-     ); 3;
-  SI(OU(ET(D33>E33;V26>W26); ET(D33<E33;V26<W26); ET(D33=E33;V26=W26;D33+V26=E33+W26));
-     2; 0)
-  ))))
-
-D33/E33 = score réel domicile/extérieur
-V26/W26 = pronostic domicile/extérieur
+Compteurs (cumulatifs pour les égalités) :
+  BB → BB + PP + PJ
+  PP → PP + PJ
+  PA → PA + PJ
+  PJ → PJ
 """
 
-def compute_points(real_home: int, real_away: int,
-                   pred_home: int, pred_away: int) -> dict:
-    """
-    Retourne un dict {points, label} pour un pronostic.
-    label : 'BB', 'PP', 'PA', 'PJ', ''
-    """
-    # Score exact ?
+def compute_points(real_home, real_away, pred_home, pred_away):
+    """Retourne {points, label, pj, pp, pa, bb}."""
     exact = (real_home == pred_home and real_away == pred_away)
+
     if exact:
-        total_goals = real_home + real_away
-        if total_goals >= 4:
-            return {"points": 6, "label": "BB"}
+        total = real_home + real_away
+        if total >= 4:
+            return {"points": 6, "label": "BB", "pj": 1, "pp": 1, "pa": 0, "bb": 1}
         else:
-            return {"points": 4, "label": "PP"}
+            return {"points": 4, "label": "PP", "pj": 1, "pp": 1, "pa": 0, "bb": 0}
 
-    # Bonne issue ?
     def outcome(h, a):
-        if h > a:
-            return "H"
-        elif h < a:
-            return "A"
-        else:
-            return "D"
+        if h > a: return "H"
+        if h < a: return "A"
+        return "D"
 
-    real_outcome = outcome(real_home, real_away)
-    pred_outcome = outcome(pred_home, pred_away)
-    good_outcome = (real_outcome == pred_outcome)
+    good = outcome(real_home, real_away) == outcome(pred_home, pred_away)
 
-    if good_outcome:
-        # PA = bonne issue + différence de buts proche (±1) + total de buts proche (±2)
+    if good:
         diff_real = abs(real_home - real_away)
         diff_pred = abs(pred_home - pred_away)
         goal_diff_close = abs(diff_real - diff_pred) <= 1
         total_close = abs((real_home + real_away) - (pred_home + pred_away)) <= 2
-
         if goal_diff_close and total_close:
-            return {"points": 3, "label": "PA"}
+            return {"points": 3, "label": "PA", "pj": 1, "pp": 0, "pa": 1, "bb": 0}
         else:
-            return {"points": 2, "label": "PJ"}
-    else:
-        return {"points": 0, "label": ""}
+            return {"points": 2, "label": "PJ", "pj": 1, "pp": 0, "pa": 0, "bb": 0}
+
+    return {"points": 0, "label": "", "pj": 0, "pp": 0, "pa": 0, "bb": 0}
 
 
-def compute_estimate_points(real_score: int, estimated_score: int) -> int:
-    """
-    +2 points si l'estimation est exacte, 0 sinon.
-    """
+def compute_estimate_points(real_score, estimated_score):
     return 2 if real_score == estimated_score else 0
 
 
-def compute_matchday_stats(pronostics_with_results: list) -> dict:
+def compute_matchday_stats(pronostics_with_results):
     """
-    Calcule les stats agrégées pour un joueur sur une journée.
-
-    pronostics_with_results : liste de dicts avec
-      real_home, real_away, pred_home, pred_away
-      (ne passer que les matchs terminés)
-
+    pronostics_with_results : liste de dicts avec real_home, real_away, pred_home, pred_away
     Retourne : {points, pj, pp, pa, bb}
     """
-    total_points = 0
-    pj = pp = pa = bb = 0
-
+    total_pts = pj = pp = pa = bb = 0
     for p in pronostics_with_results:
-        result = compute_points(
-            p["real_home"], p["real_away"],
-            p["pred_home"], p["pred_away"]
-        )
-        pts = result["points"]
-        label = result["label"]
-        total_points += pts
-        if label == "PJ":
-            pj += 1
-        elif label == "PP":
-            pp += 1
-        elif label == "PA":
-            pa += 1
-        elif label == "BB":
-            bb += 1
-
-    return {
-        "points": total_points,
-        "pj": pj,
-        "pp": pp,
-        "pa": pa,
-        "bb": bb
-    }
+        r = compute_points(p["real_home"], p["real_away"], p["pred_home"], p["pred_away"])
+        total_pts += r["points"]
+        pj += r["pj"]
+        pp += r["pp"]
+        pa += r["pa"]
+        bb += r["bb"]
+    return {"points": total_pts, "pj": pj, "pp": pp, "pa": pa, "bb": bb}
 
 
-def compute_general_ranking(players_data: list) -> list:
-    """
-    Tri général : points DESC → PJ DESC → PP DESC → PA DESC.
-
-    players_data : liste de dicts {user_id, username, points, pj, pp, pa, bb, estimates_ok}
-    Retourne la liste triée avec rang.
-    """
-    sorted_players = sorted(
+def compute_general_ranking(players_data):
+    """Tri : points DESC → PJ DESC → PP DESC → PA DESC."""
+    sorted_p = sorted(
         players_data,
         key=lambda x: (-x["points"], -x["pj"], -x["pp"], -x["pa"])
     )
-    rank = 1
-    for i, player in enumerate(sorted_players):
+    for i, p in enumerate(sorted_p):
         if i > 0:
-            prev = sorted_players[i - 1]
-            if (player["points"] == prev["points"] and
-                    player["pj"] == prev["pj"] and
-                    player["pp"] == prev["pp"] and
-                    player["pa"] == prev["pa"]):
-                player["rank"] = prev["rank"]
-            else:
-                rank = i + 1
-                player["rank"] = rank
+            prev = sorted_p[i-1]
+            same = (p["points"] == prev["points"] and p["pj"] == prev["pj"]
+                    and p["pp"] == prev["pp"] and p["pa"] == prev["pa"])
+            p["rank"] = prev["rank"] if same else i + 1
         else:
-            player["rank"] = 1
-    return sorted_players
+            p["rank"] = 1
+    return sorted_p
