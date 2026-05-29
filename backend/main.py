@@ -309,7 +309,9 @@ async def journee(request: Request, season_id: int, number: int):
     now = datetime.now(timezone.utc)
     estimate_locked = read_only or (first_ko is not None and now >= first_ko)
 
-    all_matchdays = [r["number"] for r in qall(conn, "SELECT number FROM matchdays WHERE season_id=%s ORDER BY number", (season_id,))]
+    md_rows = qall(conn, "SELECT number, label FROM matchdays WHERE season_id=%s ORDER BY number", (season_id,))
+    all_matchdays = [r["number"] for r in md_rows]
+    all_matchday_labels = {r["number"]: r["label"] or f"Journée {r['number']}" for r in md_rows}
 
     # Pronostics visibles si match commencé ou saison archivée
     all_pronostics = {}
@@ -398,6 +400,7 @@ async def journee(request: Request, season_id: int, number: int):
         "my_estimate": dict(my_estimate) if my_estimate else None,
         "estimate_locked": estimate_locked,
         "all_matchdays": all_matchdays,
+        "all_matchday_labels": all_matchday_labels,
         "all_pronostics": all_pronostics,
         "points_by_match": points_by_match,
         "now_utc": utcnow_str(),
@@ -693,6 +696,18 @@ async def admin_journee(request: Request, number: int):
         "season": dict(season), "matchday": dict(matchday) if matchday else None,
         "matches": [dict(m) for m in matches],
     })
+
+@app.post("/admin/matchday/rename")
+async def admin_rename_matchday(request: Request, matchday_id: int = Form(...),
+                                label: str = Form(...)):
+    require_admin(request)
+    conn = get_db()
+    q(conn, "UPDATE matchdays SET label=%s WHERE id=%s", (label.strip(), matchday_id))
+    conn.commit()
+    md = qone(conn, "SELECT number FROM matchdays WHERE id=%s", (matchday_id,))
+    release_db(conn)
+    return RedirectResponse(f"/admin/journee/{md['number']}", status_code=303)
+
 
 @app.post("/admin/match/add")
 async def admin_add_match(request: Request, matchday_id: int = Form(...),
