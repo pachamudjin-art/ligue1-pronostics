@@ -839,3 +839,109 @@ input[type=time].admin-in:focus {
   .chat-panel { width: 100vw; right: -100vw; }
   .chat-panel.open { right: 0; }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Thèmes utilisateur
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Nuit Bleue ─────────────────────────────────────────────── */
+[data-theme="nuit-bleue"] {
+  --bg:        #0a0f1e;
+  --surface:   #111827;
+  --surface2:  #1e2a3a;
+  --border:    #2d3f55;
+  --accent:    #60a5fa;
+  --accent2:   #3b82f6;
+  --text:      #e2e8f0;
+  --muted:     #94a3b8;
+  --green:     #34d399;
+}
+[data-theme="nuit-bleue"] .nav-brand { color: var(--accent); }
+[data-theme="nuit-bleue"] nav { border-bottom-color: var(--accent); }
+
+/* ── Rouge Passion ──────────────────────────────────────────── */
+[data-theme="rouge-passion"] {
+  --bg:        #0f0a0a;
+  --surface:   #1a0f0f;
+  --surface2:  #2a1515;
+  --border:    #4a2020;
+  --accent:    #f87171;
+  --accent2:   #ef4444;
+  --text:      #fef2f2;
+  --muted:     #b0807e;
+  --green:     #4ade80;
+}
+[data-theme="rouge-passion"] .nav-brand { color: var(--accent); }
+[data-theme="rouge-passion"] nav { border-bottom-color: var(--accent); }
+
+/* ── Néon ───────────────────────────────────────────────────── */
+[data-theme="neon"] {
+  --bg:        #050510;
+  --surface:   #0a0a1f;
+  --surface2:  #12122e;
+  --border:    #2a2a5a;
+  --accent:    #a78bfa;
+  --accent2:   #7c3aed;
+  --text:      #f0f0ff;
+  --muted:     #8080b0;
+  --green:     #34d399;
+}
+[data-theme="neon"] .nav-brand { color: var(--accent); text-shadow: 0 0 20px var(--accent); }
+[data-theme="neon"] nav { border-bottom-color: var(--accent); box-shadow: 0 2px 20px rgba(167,139,250,.2); }
+[data-theme="neon"] .card { box-shadow: 0 4px 24px rgba(167,139,250,.08); }
+[data-theme="neon"] .btn-primary { background: var(--accent2); color: #fff; box-shadow: 0 0 12px rgba(124,58,237,.4); }
+[data-theme="neon"] .score-display { color: var(--accent); text-shadow: 0 0 8px var(--accent); }
+
+/* ── Minimaliste ────────────────────────────────────────────── */
+[data-theme="minimaliste"] {
+  --bg:        #f8fafc;
+  --surface:   #ffffff;
+  --surface2:  #f1f5f9;
+  --border:    #e2e8f0;
+  --accent:    #1e40af;
+  --accent2:   #dc2626;
+  --text:      #0f172a;
+  --muted:     #64748b;
+  --green:     #16a34a;
+  --shadow:    0 2px 8px rgba(0,0,0,.08);
+}
+[data-theme="minimaliste"] body { background: var(--bg); }
+[data-theme="minimaliste"] nav { background: #fff; border-bottom: 1px solid var(--border); }
+[data-theme="minimaliste"] .nav-brand { color: var(--accent); }
+[data-theme="minimaliste"] .card { background: #fff; border-color: var(--border); }
+[data-theme="minimaliste"] .btn-primary { background: var(--accent); }
+[data-theme="minimaliste"] h1 { color: var(--accent); }
+[data-theme="minimaliste"] .badge-bb { background: #7c3aed; }
+[data-theme="minimaliste"] #chat-fab { background: var(--accent); }
+
+/* ── Glassmorphism ──────────────────────────────────────────── */
+[data-theme="glassmorphism"] {
+  --bg:        #0f172a;
+  --surface:   rgba(255,255,255,.07);
+  --surface2:  rgba(255,255,255,.04);
+  --border:    rgba(255,255,255,.12);
+  --accent:    #38bdf8;
+  --accent2:   #0ea5e9;
+  --text:      #f0f9ff;
+  --muted:     #7dd3fc;
+  --green:     #4ade80;
+}
+[data-theme="glassmorphism"] body {
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+  min-height: 100vh;
+}
+[data-theme="glassmorphism"] nav {
+  background: rgba(255,255,255,.06);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+[data-theme="glassmorphism"] .card, [data-theme="glassmorphism"] .match-card {
+  background: rgba(255,255,255,.06);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.1);
+}
+[data-theme="glassmorphism"] .nav-brand { color: var(--accent); }
+[data-theme="glassmorphism"] .btn-primary { background: rgba(56,189,248,.2); color: var(--accent); border: 1px solid var(--accent); }
+[data-theme="glassmorphism"] #chat-fab { background: rgba(56,189,248,.2); border: 1px solid var(--accent); }
+[data-theme="glassmorphism"] .chat-panel { background: rgba(15,23,42,.85); backdrop-filter: blur(20px); }
