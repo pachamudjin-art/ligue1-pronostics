@@ -1,10 +1,13 @@
 """
-Base de données PostgreSQL via psycopg2-binary
+Base de données PostgreSQL via psycopg2 avec pool de connexions.
 """
 import os
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 from datetime import date
+
+_pool = None
 
 def get_pg_url():
     url = os.environ.get("DATABASE_URL", "")
@@ -12,10 +15,34 @@ def get_pg_url():
         url = url.replace("postgres://", "postgresql://", 1)
     return url
 
+def init_pool():
+    global _pool
+    if _pool is None:
+        _pool = psycopg2.pool.ThreadedConnectionPool(
+            minconn=1,
+            maxconn=10,
+            dsn=get_pg_url()
+        )
+        print("Pool de connexions initialisé.")
+
 def get_db():
-    conn = psycopg2.connect(get_pg_url(), cursor_factory=psycopg2.extras.RealDictCursor)
+    """Retourne une connexion depuis le pool."""
+    global _pool
+    if _pool is None:
+        init_pool()
+    conn = _pool.getconn()
+    conn.cursor_factory = psycopg2.extras.RealDictCursor
     conn.autocommit = False
     return conn
+
+def release_db(conn):
+    """Remet la connexion dans le pool."""
+    global _pool
+    if _pool and conn:
+        try:
+            _pool.putconn(conn)
+        except Exception:
+            pass
 
 def q(conn, sql, params=None):
     c = conn.cursor()
@@ -28,7 +55,6 @@ def qone(conn, sql, params=None):
 def qall(conn, sql, params=None):
     return q(conn, sql, params).fetchall()
 
-# Alias pour compatibilité
 get_db_conn = get_db
 
 def init_db():
@@ -76,7 +102,7 @@ def init_db():
     for stmt in stmts:
         c.execute(stmt)
     conn.commit()
-    conn.close()
+    release_db(conn)
     print("Base de données initialisée.")
 
 def get_current_season_years():
@@ -89,7 +115,7 @@ def ensure_season_exists(year_start, year_end):
     conn = get_db()
     existing = qone(conn, "SELECT id FROM seasons WHERE year_start=%s", (year_start,))
     if existing:
-        conn.close()
+        release_db(conn)
         return existing["id"]
     name = f"Ligue 1 {year_start}/{year_end}"
     c = conn.cursor()
@@ -100,7 +126,7 @@ def ensure_season_exists(year_start, year_end):
         c.execute("INSERT INTO matchdays (season_id,number,label) VALUES (%s,%s,%s)",
                   (season_id, i, f"Journée {i}"))
     conn.commit()
-    conn.close()
+    release_db(conn)
     print(f"Saison {name} créée.")
     return season_id
 
@@ -114,13 +140,13 @@ def seed_users():
     admin_pwd = hashlib.sha256("admin123".encode()).hexdigest()
     q(conn, "INSERT INTO users (username,password_hash,is_admin) VALUES (%s,%s,1) ON CONFLICT(username) DO NOTHING", ("admin", admin_pwd))
     conn.commit()
-    conn.close()
+    release_db(conn)
     print("Utilisateurs créés.")
 
 def seed_active_season():
     conn = get_db()
     active = qone(conn, "SELECT id FROM seasons WHERE is_active=1")
-    conn.close()
+    release_db(conn)
     if active:
         return
     year_start, year_end = get_current_season_years()
@@ -128,5 +154,5 @@ def seed_active_season():
     conn = get_db()
     q(conn, "UPDATE seasons SET is_active=1 WHERE id=%s", (season_id,))
     conn.commit()
-    conn.close()
+    release_db(conn)
     print(f"Saison {year_start}/{year_end} activée.")

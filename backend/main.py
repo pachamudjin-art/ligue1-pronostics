@@ -11,7 +11,7 @@ import hashlib
 import os
 from datetime import datetime, timezone
 
-from database import (get_db, init_db, seed_users, seed_active_season,
+from database import (get_db, release_db, init_db, seed_users, seed_active_season,
                       ensure_season_exists, get_current_season_years,
                       q, qone, qall)
 from scoring import (compute_points, compute_estimate_points,
@@ -33,7 +33,7 @@ async def health():
         c = conn.cursor()
         c.execute("SELECT 1 as ok")
         row = c.fetchone()
-        conn.close()
+        release_db(conn)
         db_test = "OK" if row else "pas de réponse"
     except Exception as e:
         db_test = f"ERREUR: {str(e)[:200]}"
@@ -78,19 +78,19 @@ def matchday_first_kickoff(matches):
 def get_active_season():
     conn = get_db()
     s = qone(conn, "SELECT * FROM seasons WHERE is_active=1 ORDER BY year_start DESC LIMIT 1")
-    conn.close()
+    release_db(conn)
     return dict(s) if s else None
 
 def get_season_by_id(sid):
     conn = get_db()
     s = qone(conn, "SELECT * FROM seasons WHERE id=%s", (sid,))
-    conn.close()
+    release_db(conn)
     return dict(s) if s else None
 
 def get_all_seasons():
     conn = get_db()
     rows = qall(conn, "SELECT * FROM seasons ORDER BY year_start DESC")
-    conn.close()
+    release_db(conn)
     return [dict(r) for r in rows]
 
 def compute_ranking_for_season(season_id, conn):
@@ -142,7 +142,7 @@ async def login_page(request: Request):
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
     conn = get_db()
     user = qone(conn, "SELECT * FROM users WHERE username=%s", (username,))
-    conn.close()
+    release_db(conn)
     if user and user["password_hash"] == hash_password(password):
         request.session["user"] = {"id": user["id"], "username": user["username"], "is_admin": bool(user["is_admin"])}
         return RedirectResponse("/", status_code=303)
@@ -182,14 +182,14 @@ async def change_password(request: Request, current_password: str = Form(...),
     conn = get_db()
     db_user = qone(conn, "SELECT * FROM users WHERE id=%s", (user["id"],))
     if db_user["password_hash"] != hash_password(current_password):
-        conn.close()
+        release_db(conn)
         return templates.TemplateResponse("profil.html", {
             "request": request, "user": user, "season": season,
             "error": "Mot de passe actuel incorrect."
         })
     q(conn, "UPDATE users SET password_hash=%s WHERE id=%s", (hash_password(new_password), user["id"]))
     conn.commit()
-    conn.close()
+    release_db(conn)
     return templates.TemplateResponse("profil.html", {
         "request": request, "user": user, "season": season,
         "success": "Mot de passe modifié avec succès !"
@@ -202,7 +202,7 @@ async def admin_reset_password(request: Request, user_id: int = Form(...), new_p
     conn = get_db()
     q(conn, "UPDATE users SET password_hash=%s WHERE id=%s", (hash_password(new_password), user_id))
     conn.commit()
-    conn.close()
+    release_db(conn)
     return RedirectResponse("/admin", status_code=303)
 
 
@@ -223,7 +223,7 @@ async def home(request: Request):
     """, (season["id"],))
     if not matchday:
         matchday = qone(conn, "SELECT * FROM matchdays WHERE season_id=%s ORDER BY number LIMIT 1", (season["id"],))
-    conn.close()
+    release_db(conn)
     if matchday:
         return RedirectResponse(f"/saison/{season['id']}/journee/{matchday['number']}", status_code=303)
     return templates.TemplateResponse("error.html", {"request": request, "message": "Aucune journée disponible."})
@@ -247,7 +247,7 @@ async def journee(request: Request, season_id: int, number: int):
     conn = get_db()
     matchday = qone(conn, "SELECT * FROM matchdays WHERE season_id=%s AND number=%s", (season_id, number))
     if not matchday:
-        conn.close()
+        release_db(conn)
         return templates.TemplateResponse("error.html", {"request": request, "message": f"Journée {number} introuvable."})
 
     matches = qall(conn, "SELECT * FROM matches WHERE matchday_id=%s ORDER BY kickoff_time", (matchday["id"],))
@@ -299,7 +299,7 @@ async def journee(request: Request, season_id: int, number: int):
                 missing_pronostics.append(u["username"])
 
     all_seasons = get_all_seasons()
-    conn.close()
+    release_db(conn)
 
     return templates.TemplateResponse("journee.html", {
         "request": request, "user": user,
@@ -336,15 +336,15 @@ async def submit_pronostic(request: Request, match_id: int = Form(...),
     conn = get_db()
     match = qone(conn, "SELECT * FROM matches WHERE id=%s", (match_id,))
     if not match:
-        conn.close()
+        release_db(conn)
         return JSONResponse({"ok": False, "error": "Match introuvable"}, status_code=404)
     if match_is_locked(match):
-        conn.close()
+        release_db(conn)
         return JSONResponse({"ok": False, "error": "Match verrouillé"}, status_code=403)
     md = qone(conn, "SELECT md.season_id FROM matchdays md JOIN matches m ON m.matchday_id=md.id WHERE m.id=%s", (match_id,))
     active = get_active_season()
     if not active or md["season_id"] != active["id"]:
-        conn.close()
+        release_db(conn)
         return JSONResponse({"ok": False, "error": "Saison archivée"}, status_code=403)
     now = utcnow_str()
     q(conn, """
@@ -354,7 +354,7 @@ async def submit_pronostic(request: Request, match_id: int = Form(...),
             home_score=EXCLUDED.home_score, away_score=EXCLUDED.away_score, updated_at=EXCLUDED.updated_at
     """, (user["id"], match_id, home_score, away_score, now))
     conn.commit()
-    conn.close()
+    release_db(conn)
     return JSONResponse({"ok": True})
 
 
@@ -369,12 +369,12 @@ async def submit_estimation(request: Request, matchday_id: int = Form(...),
     md = qone(conn, "SELECT * FROM matchdays WHERE id=%s", (matchday_id,))
     active = get_active_season()
     if not active or md["season_id"] != active["id"]:
-        conn.close()
+        release_db(conn)
         return JSONResponse({"ok": False, "error": "Saison archivée"}, status_code=403)
     matches = qall(conn, "SELECT * FROM matches WHERE matchday_id=%s ORDER BY kickoff_time LIMIT 1", (matchday_id,))
     first_ko = matchday_first_kickoff(matches)
     if first_ko and datetime.now(timezone.utc) >= first_ko:
-        conn.close()
+        release_db(conn)
         return JSONResponse({"ok": False, "error": "Estimation verrouillée"}, status_code=403)
     now = utcnow_str()
     q(conn, """
@@ -384,7 +384,7 @@ async def submit_estimation(request: Request, matchday_id: int = Form(...),
             estimated_score=EXCLUDED.estimated_score, updated_at=EXCLUDED.updated_at
     """, (user["id"], matchday_id, estimated_score, now))
     conn.commit()
-    conn.close()
+    release_db(conn)
     return JSONResponse({"ok": True})
 
 
@@ -408,7 +408,7 @@ async def classement(request: Request, season_id: int):
     conn = get_db()
     ranked = compute_ranking_for_season(season_id, conn)
     all_matchdays = [r["number"] for r in qall(conn, "SELECT number FROM matchdays WHERE season_id=%s ORDER BY number", (season_id,))]
-    conn.close()
+    release_db(conn)
     active_season = get_active_season()
     return templates.TemplateResponse("classement.html", {
         "request": request, "user": user,
@@ -435,7 +435,7 @@ async def admin_page(request: Request):
         matchdays = [dict(m) for m in matchdays]
     # Tous les joueurs pour reset mdp
     all_users = qall(conn, "SELECT id, username FROM users WHERE is_admin=0 ORDER BY username")
-    conn.close()
+    release_db(conn)
     return templates.TemplateResponse("admin.html", {
         "request": request, "user": admin,
         "season": active_season,
@@ -451,7 +451,7 @@ async def admin_set_active_season(request: Request, season_id: int = Form(...)):
     q(conn, "UPDATE seasons SET is_active=0")
     q(conn, "UPDATE seasons SET is_active=1 WHERE id=%s", (season_id,))
     conn.commit()
-    conn.close()
+    release_db(conn)
     return RedirectResponse("/admin", status_code=303)
 
 @app.post("/admin/season/create")
@@ -467,7 +467,7 @@ async def admin_journee(request: Request, number: int):
     conn = get_db()
     matchday = qone(conn, "SELECT * FROM matchdays WHERE season_id=%s AND number=%s", (season["id"], number))
     matches = qall(conn, "SELECT * FROM matches WHERE matchday_id=%s ORDER BY kickoff_time", (matchday["id"],)) if matchday else []
-    conn.close()
+    release_db(conn)
     return templates.TemplateResponse("admin_journee.html", {
         "request": request, "user": admin,
         "season": dict(season), "matchday": dict(matchday) if matchday else None,
@@ -484,7 +484,7 @@ async def admin_add_match(request: Request, matchday_id: int = Form(...),
       (matchday_id, home_team, away_team, f"{kickoff_date} {kickoff_time}:00"))
     conn.commit()
     md = qone(conn, "SELECT number FROM matchdays WHERE id=%s", (matchday_id,))
-    conn.close()
+    release_db(conn)
     return RedirectResponse(f"/admin/journee/{md['number']}", status_code=303)
 
 @app.post("/admin/match/update-score")
@@ -496,7 +496,7 @@ async def admin_update_score(request: Request, match_id: int = Form(...),
       (home_score, away_score, match_id))
     conn.commit()
     md = qone(conn, "SELECT md.number FROM matchdays md JOIN matches m ON m.matchday_id=md.id WHERE m.id=%s", (match_id,))
-    conn.close()
+    release_db(conn)
     return RedirectResponse(f"/admin/journee/{md['number']}", status_code=303)
 
 @app.post("/admin/match/update-kickoff")
@@ -508,7 +508,7 @@ async def admin_update_kickoff(request: Request, match_id: int = Form(...),
       (f"{kickoff_date} {kickoff_time}:00", match_id))
     conn.commit()
     md = qone(conn, "SELECT md.number FROM matchdays md JOIN matches m ON m.matchday_id=md.id WHERE m.id=%s", (match_id,))
-    conn.close()
+    release_db(conn)
     return RedirectResponse(f"/admin/journee/{md['number']}", status_code=303)
 
 @app.post("/admin/match/delete")
@@ -519,7 +519,7 @@ async def admin_delete_match(request: Request, match_id: int = Form(...)):
     q(conn, "DELETE FROM pronostics WHERE match_id=%s", (match_id,))
     q(conn, "DELETE FROM matches WHERE id=%s", (match_id,))
     conn.commit()
-    conn.close()
+    release_db(conn)
     return RedirectResponse(f"/admin/journee/{md['number']}", status_code=303)
 
 @app.post("/admin/import-api")
@@ -531,10 +531,10 @@ async def admin_import_api(request: Request, matchday_number: int = Form(...),
     year_to_use = api_year if api_year else season["year_start"]
     matchday = qone(conn, "SELECT * FROM matchdays WHERE season_id=%s AND number=%s", (season["id"], matchday_number))
     if not matchday:
-        conn.close()
+        release_db(conn)
         return JSONResponse({"ok": False, "error": f"Journée {matchday_number} introuvable"})
     nb, errors = import_matchday_to_db(year_to_use, matchday_number, season["id"], matchday["id"], conn)
-    conn.close()
+    release_db(conn)
     return JSONResponse({"ok": True, "imported": nb, "errors": errors})
 
 @app.post("/admin/import-saison-complete")
@@ -545,7 +545,7 @@ async def admin_import_saison_complete(request: Request):
     year_to_use = season["year_start"]
     all_fixtures = fetch_fixtures(year_to_use)
     if not all_fixtures:
-        conn.close()
+        release_db(conn)
         return JSONResponse({"ok": False, "error": "Aucun match récupéré depuis l'API."})
 
     matchdays = qall(conn, "SELECT * FROM matchdays WHERE season_id=%s ORDER BY number", (season["id"],))
@@ -576,7 +576,7 @@ async def admin_import_saison_complete(request: Request):
             total_errors.append(f"J{jn}: {str(e)}")
 
     journees_vides = [md["number"] for md in matchdays if md["number"] not in journees_ok]
-    conn.close()
+    release_db(conn)
     return JSONResponse({"ok": True, "total_imported": total_imported,
                          "journees_importees": sorted(journees_ok),
                          "journees_vides": sorted(journees_vides),
@@ -588,7 +588,7 @@ async def admin_update_scores_api(request: Request):
     season = get_active_season()
     conn = get_db()
     nb = update_live_scores(season["year_start"], conn)
-    conn.close()
+    release_db(conn)
     return JSONResponse({"ok": True, "updated": nb})
 
 
@@ -604,7 +604,7 @@ async def chat_page(request: Request):
         FROM chat_messages cm JOIN users u ON u.id=cm.user_id
         ORDER BY cm.created_at DESC LIMIT 100
     """)
-    conn.close()
+    release_db(conn)
     season = get_active_season()
     return templates.TemplateResponse("chat.html", {
         "request": request, "user": user, "season": season,
@@ -621,7 +621,7 @@ async def chat_poll(request: Request, after_id: int = 0):
         FROM chat_messages cm JOIN users u ON u.id=cm.user_id
         WHERE cm.id > %s ORDER BY cm.created_at ASC LIMIT 50
     """, (after_id,))
-    conn.close()
+    release_db(conn)
     return JSONResponse({"ok": True, "messages": [dict(r) for r in rows]})
 
 @app.post("/chat/send")
@@ -639,7 +639,7 @@ async def chat_send(request: Request, message: str = Form(...)):
         SELECT cm.id, cm.message, cm.created_at, u.username
         FROM chat_messages cm JOIN users u ON u.id=cm.user_id WHERE cm.id=%s
     """, (new_id,))
-    conn.close()
+    release_db(conn)
     return JSONResponse({"ok": True, "message": dict(row)})
 
 @app.post("/chat/delete")
@@ -649,14 +649,14 @@ async def chat_delete(request: Request, message_id: int = Form(...)):
     conn = get_db()
     msg = qone(conn, "SELECT user_id FROM chat_messages WHERE id=%s", (message_id,))
     if not msg:
-        conn.close()
+        release_db(conn)
         return JSONResponse({"ok": False, "error": "Message introuvable"})
     if msg["user_id"] != user["id"] and not user.get("is_admin"):
-        conn.close()
+        release_db(conn)
         return JSONResponse({"ok": False, "error": "Non autorisé"}, status_code=403)
     q(conn, "DELETE FROM chat_messages WHERE id=%s", (message_id,))
     conn.commit()
-    conn.close()
+    release_db(conn)
     return JSONResponse({"ok": True})
 
 
@@ -709,7 +709,7 @@ async def admin_debug(request: Request):
         FROM pronostics p JOIN users u ON u.id=p.user_id JOIN matches m ON m.id=p.match_id
         ORDER BY u.username, m.kickoff_time
     """)
-    conn.close()
+    release_db(conn)
     rows_m = "".join(
         f"<tr><td>J{m['journee']}</td><td>{m['home_team']} – {m['away_team']}</td>"
         f"<td>{m['kickoff_time']}</td>"
