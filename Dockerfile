@@ -1,5 +1,7 @@
 FROM python:3.11-slim
 
+# cache-bust: 2026-05-29
+
 # Installer les dépendances système pour psycopg2
 RUN apt-get update && apt-get install -y \
     libpq-dev \
