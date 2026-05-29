@@ -479,3 +479,52 @@ async function sendGif(url) {
     toast("Erreur envoi GIF", "err");
   }
 }
+
+
+// ── Admin : importer la saison complète ──────────────────────
+async function importSaisonComplete() {
+  if (!confirm("Importer toute la saison (34 journées) depuis l'API ?\nCela peut prendre 30 à 60 secondes.")) return;
+
+  const btn = document.getElementById("btn_import_saison");
+  const progress = document.getElementById("import_saison_progress");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Import en cours…"; }
+  if (progress) { progress.style.display = "block"; progress.textContent = "Connexion à l'API…"; }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120000); // 2 min max
+
+  try {
+    const res = await fetch("/admin/import-saison-complete", {
+      method: "POST", signal: controller.signal
+    });
+    clearTimeout(timeout);
+    const data = await res.json();
+
+    if (data.ok) {
+      const msg = `✓ ${data.total_imported} match(s) importé(s) sur ${data.journees_importees.length} journée(s)`;
+      toast(msg, "ok", 5000);
+      if (progress) progress.textContent = msg;
+
+      if (data.journees_vides && data.journees_vides.length > 0) {
+        toast(`${data.journees_vides.length} journée(s) sans match (calendrier incomplet ?)`, "ok", 4000);
+      }
+      if (data.errors && data.errors.length > 0) {
+        toast("Quelques erreurs : " + data.errors[0], "err", 5000);
+      }
+      setTimeout(() => window.location.reload(), 2000);
+    } else {
+      toast(data.error || "Erreur import", "err");
+      if (progress) progress.style.display = "none";
+    }
+  } catch (e) {
+    clearTimeout(timeout);
+    if (e.name === "AbortError") {
+      toast("Délai dépassé (2 min) — l'import est peut-être en cours, rechargez la page", "err", 6000);
+    } else {
+      toast("Erreur réseau : " + e.message, "err");
+    }
+    if (progress) progress.style.display = "none";
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = "📥 Importer toute la saison (API)"; }
+}
