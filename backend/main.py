@@ -22,6 +22,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
 
 app = FastAPI(title="Ligue 1 Pronostics")
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "db_url_set": bool(os.environ.get("DATABASE_URL"))}
+
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.environ.get("SECRET_KEY", "changeme-in-production-please")
@@ -747,10 +752,19 @@ async def admin_test_api(request: Request):
 
 @app.on_event("startup")
 async def startup():
-    init_db()
-    seed_users()
-    seed_active_season()
-    print("Application démarrée.")
+    import time
+    print("Démarrage de l'application...")
+    for attempt in range(5):
+        try:
+            init_db()
+            seed_users()
+            seed_active_season()
+            print("Application démarrée.")
+            return
+        except Exception as e:
+            print(f"Tentative {attempt+1}/5 échouée: {e}")
+            time.sleep(3)
+    print("ATTENTION: Base de données non disponible, démarrage sans DB.")
 
 if __name__ == "__main__":
     import uvicorn
