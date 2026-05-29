@@ -135,8 +135,16 @@
           <td style="text-align:center; color:var(--muted);">{{ p.pp }}</td>
           <td style="text-align:center; color:var(--muted);">{{ p.pa }}</td>
           <td style="text-align:center;">{% if p.bb > 0 %}<span style="color:#9b59b6;">{{ p.bb }}</span>{% else %}—{% endif %}</td>
-          <td style="text-align:center; font-size:.8rem; color:var(--muted);">
-            {% if p.estimation is not none %}{{ p.estimation }}{% else %}—{% endif %}
+          <td style="text-align:center;">
+            {% if p.nb_matchs == p.nb_pronos and p.nb_matchs > 0 %}
+              {% if p.est_pts == 2 %}
+                <span style="color:var(--green); font-size:1rem;">✓</span>
+              {% elif p.estimation is not none %}
+                <span style="color:#e74c3c; font-size:.9rem;">✗</span>
+              {% else %}—{% endif %}
+            {% elif p.estimation is not none %}
+              <span style="color:var(--muted); font-size:.75rem;">{{ p.estimation }}</span>
+            {% else %}—{% endif %}
           </td>
           <td style="text-align:center; font-size:.75rem; color:var(--muted);">
             {{ p.nb_pronos }}/{{ p.nb_matchs }}
