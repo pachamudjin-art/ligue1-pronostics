@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Mon profil — L1 Pronostics{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:500px;">
+  <h1>👤 Mon profil</h1>
+  <p style="color:var(--muted); margin-bottom:1.5rem;">Connecté en tant que <strong style="color:var(--accent)">{{ user.username }}</strong></p>
+
+  <div class="card">
+    <h2 style="margin-bottom:1rem;">Changer mon mot de passe</h2>
+
+    {% if error %}
+    <div class="error-msg">{{ error }}</div>
+    {% endif %}
+    {% if success %}
+    <div style="background:rgba(46,160,67,.15); border:1px solid rgba(46,160,67,.3); color:#2ea043;
+                border-radius:7px; padding:.6rem .9rem; font-size:.85rem; margin-bottom:1rem;">
+      ✓ {{ success }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/profil/change-password">
+      <div class="field">
+        <label>Mot de passe actuel</label>
+        <input type="password" name="current_password" required autocomplete="current-password">
+      </div>
+      <div class="field">
+        <label>Nouveau mot de passe</label>
+        <input type="password" name="new_password" required autocomplete="new-password" minlength="4">
+      </div>
+      <div class="field">
+        <label>Confirmer le nouveau mot de passe</label>
+        <input type="password" name="confirm_password" required autocomplete="new-password" minlength="4">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; padding:.7rem; margin-top:.5rem;">
+        Changer le mot de passe
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

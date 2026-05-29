@@ -100,11 +100,24 @@
   {% endif %}
 
   <div class="card" style="margin-top:1.5rem;">
-    <h2 style="margin-bottom:.75rem;">Mots de passe initiaux</h2>
-    <p style="font-size:.85rem; color:var(--muted);">
-      Prénom en minuscules. Admin : <code style="background:var(--surface2); padding:.1rem .4rem; border-radius:4px;">admin123</code>
-      — <strong style="color:var(--accent);">changez-le !</strong>
+    <h2 style="margin-bottom:.75rem;">Réinitialiser un mot de passe</h2>
+    <p style="font-size:.82rem; color:var(--muted); margin-bottom:.75rem;">
+      En cas d'oubli, vous pouvez forcer un nouveau mot de passe pour n'importe quel joueur.
     </p>
+    <form method="post" action="/admin/reset-password"
+          style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
+      <select name="user_id" class="admin-in" style="width:auto;" required>
+        {% for u in all_users %}
+        <option value="{{ u.id }}">{{ u.username }}</option>
+        {% endfor %}
+      </select>
+      <input type="text" name="new_password" class="admin-in" style="width:10rem;"
+             placeholder="Nouveau mot de passe" required minlength="4">
+      <button type="submit" class="btn btn-primary btn-sm"
+              onclick="return confirm('Réinitialiser le mot de passe de ce joueur ?')">
+        Réinitialiser
+      </button>
+    </form>
   </div>
 </div>
 {% endblock %}

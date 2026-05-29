@@ -46,6 +46,21 @@
 
   <h1>Journée {{ matchday.number }}</h1>
 
+  <!-- Joueurs sans pronostic -->
+  {% if missing_pronostics and not read_only %}
+  <div style="background:rgba(192,57,43,.08); border:1px solid rgba(192,57,43,.2);
+              border-radius:8px; padding:.65rem 1rem; margin-bottom:1rem;
+              font-size:.85rem; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
+    <span style="color:#e74c3c;">⏳ En attente de pronostic :</span>
+    {% for name in missing_pronostics %}
+    <span style="background:var(--surface2); border:1px solid var(--border);
+                 border-radius:5px; padding:.1rem .5rem; color:var(--muted); font-size:.8rem;">
+      {{ name }}
+    </span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <!-- Estimation de score -->
   <div class="estimation-card">
     <div class="estimation-label">🎯 Mon estimation de score</div>
