@@ -11,7 +11,7 @@ import hashlib
 import os
 from datetime import datetime, timezone
 
-from database import (get_db, init_db, seed_users, seed_active_season,
+from database import (get_db_conn as get_db, init_db, seed_users, seed_active_season,
                       ensure_season_exists, get_current_season_years,
                       q, qone, qall)
 from scoring import (compute_points, compute_estimate_points,
