@@ -236,7 +236,10 @@ function toggleChat() {
     setTimeout(() => {
       const box = document.getElementById("chat-box");
       if (box) box.scrollTop = box.scrollHeight;
-      document.getElementById("chat-input")?.focus();
+      // Ne pas ouvrir le clavier automatiquement sur mobile
+      if (window.innerWidth > 480) {
+        document.getElementById("chat-input")?.focus();
+      }
     }, 320);
     closeEmojiPicker();
     closeGifPicker();
