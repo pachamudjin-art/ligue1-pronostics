@@ -864,6 +864,21 @@ input[type=time].admin-in:focus {
 @media (max-width: 480px) {
   .chat-panel { width: 100vw; right: -100vw; }
   .chat-panel.open { right: 0; }
+
+  /* Fixer la zone de saisie en bas même quand le clavier est ouvert */
+  .chat-panel {
+    height: 100%;
+    height: 100dvh; /* dynamic viewport height — s'adapte au clavier */
+  }
+  .chat-panel-messages {
+    flex: 1;
+    min-height: 0; /* important pour que flex fonctionne */
+  }
+  .chat-panel-input {
+    position: sticky;
+    bottom: 0;
+    flex-shrink: 0;
+  }
 }
 
 
