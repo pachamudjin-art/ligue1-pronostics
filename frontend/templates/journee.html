@@ -250,7 +250,7 @@
               {% if pts_info and pts_info.label == 'BB' %}
                 <span class="score-display" style="border-color:#9b59b6; color:#9b59b6;">{{ my_p.home_score }} – {{ my_p.away_score }}</span>
               {% elif pts_info and pts_info.label == 'PP' %}
-                <span class="score-display" style="border-color:var(--accent); color:var(--accent);">{{ my_p.home_score }} – {{ my_p.away_score }}</span>
+                <span class="score-display" style="border-color:#e8c45a; color:#e8c45a;">{{ my_p.home_score }} – {{ my_p.away_score }}</span>
               {% elif pts_info and pts_info.label == 'PA' %}
                 <span class="score-display" style="border-color:var(--green); color:var(--green);">{{ my_p.home_score }} – {{ my_p.away_score }}</span>
               {% elif pts_info and pts_info.label == 'PJ' %}
@@ -294,7 +294,7 @@
           {% if pp.label == 'BB' %}
             {% set chip_color = 'border-color:#9b59b6;' %}
           {% elif pp.label == 'PP' %}
-            {% set chip_color = 'border-color:var(--accent);' %}
+            {% set chip_color = 'border-color:#e8c45a;' %}
           {% elif pp.label == 'PA' %}
             {% set chip_color = 'border-color:var(--green);' %}
           {% elif pp.label == 'PJ' %}
