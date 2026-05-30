@@ -291,7 +291,18 @@
         <div style="font-size:.75rem; color:var(--muted); margin-bottom:.35rem; text-transform:uppercase; letter-spacing:.05em;">Pronostics</div>
         <div class="prono-grid">
           {% for pp in all_p %}
-          <div class="prono-chip">
+          {% if pp.label == 'BB' %}
+            {% set chip_color = 'border-color:#9b59b6;' %}
+          {% elif pp.label == 'PP' %}
+            {% set chip_color = 'border-color:var(--accent);' %}
+          {% elif pp.label == 'PA' %}
+            {% set chip_color = 'border-color:var(--green);' %}
+          {% elif pp.label == 'PJ' %}
+            {% set chip_color = 'border-color:#3498db;' %}
+          {% else %}
+            {% set chip_color = '' %}
+          {% endif %}
+          <div class="prono-chip" style="{{ chip_color }}">
             <span class="player-name">{{ pp.username }}</span>
             <span class="prono-score">{{ pp.home_score }}–{{ pp.away_score }}</span>
           </div>
