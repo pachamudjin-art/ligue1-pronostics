@@ -339,8 +339,10 @@ async function sendChatMsg() {
   const text = input.value.trim();
   if (!text) return;
   input.value = "";
-  input.focus();
   closeEmojiPicker();
+  // Garder le focus et le clavier ouvert sur mobile
+  input.focus();
+  input.setSelectionRange(0, 0);
 
   const fd = new FormData();
   fd.append("message", text);
