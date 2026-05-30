@@ -337,6 +337,7 @@ input[type=number].score-in::-webkit-inner-spin-button { -webkit-appearance: non
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08), 0 2px 12px rgba(232,196,90,.06);
 }
 
 .estimation-label {
@@ -349,7 +350,8 @@ input[type=number].score-in::-webkit-inner-spin-button { -webkit-appearance: non
 /* ── Ranking table ───────────────────────────────────────────── */
 .ranking-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: .88rem;
 }
 
@@ -361,15 +363,36 @@ input[type=number].score-in::-webkit-inner-spin-button { -webkit-appearance: non
   text-transform: uppercase;
   letter-spacing: .06em;
   color: var(--muted);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid var(--border);
 }
+
+.ranking-table th:first-child { border-radius: 0; }
 
 .ranking-table td {
   padding: .65rem .75rem;
   border-bottom: 1px solid var(--border);
+  transition: background .12s;
 }
 
-.ranking-table tr:hover td { background: var(--surface2); }
+.ranking-table tr:last-child td { border-bottom: none; }
+
+.ranking-table tr:hover td {
+  background: var(--surface2);
+}
+
+/* Ombre élégante sur les cards contenant les tableaux */
+.card {
+  box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 4px 16px rgba(0,0,0,.08), 0 0 0 1px rgba(255,255,255,.04);
+}
+
+.match-card {
+  box-shadow: 0 1px 4px rgba(0,0,0,.1), 0 2px 8px rgba(0,0,0,.06);
+  transition: box-shadow .2s, transform .15s;
+}
+.match-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,.15), 0 4px 16px rgba(0,0,0,.1);
+  transform: translateY(-1px);
+}
 
 .rank-num {
   font-family: 'Bebas Neue', sans-serif;
@@ -501,7 +524,8 @@ input[type=number].score-in::-webkit-inner-spin-button { -webkit-appearance: non
 /* ── Admin table ─────────────────────────────────────────────── */
 .admin-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: .85rem;
 }
 .admin-table th {
@@ -512,13 +536,15 @@ input[type=number].score-in::-webkit-inner-spin-button { -webkit-appearance: non
   font-size: .75rem;
   text-transform: uppercase;
   letter-spacing: .05em;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid var(--border);
 }
 .admin-table td {
   padding: .55rem .7rem;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
+  transition: background .12s;
 }
+.admin-table tr:last-child td { border-bottom: none; }
 .admin-table tr:hover td { background: var(--surface2); }
 
 input[type=text].admin-in,
@@ -1096,8 +1122,8 @@ input[type=time].admin-in:focus {
   --shadow:    0 2px 12px rgba(160,160,180,.18);
 }
 [data-theme="l1classic"] body {
-  background-color: #f5f5f7;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 680 420'%3E%3Crect width='680' height='420' fill='%23f5f5f7'/%3E%3Cpolygon points='0,0 220,0 180,420 0,420' fill='%23eeeef2'/%3E%3Cpolygon points='680,0 480,0 520,420 680,420' fill='%23eeeef2'/%3E%3Cpolygon points='40,0 130,0 95,420 5,420' fill='%23e8e8ec'/%3E%3Cpolygon points='160,0 210,0 185,420 135,420' fill='%23dddde3'/%3E%3Cpolygon points='260,0 295,0 275,420 240,420' fill='%23e8e8ec' opacity='.7'/%3E%3Cpolygon points='370,0 400,0 385,420 355,420' fill='%23dddde3' opacity='.8'/%3E%3Cpolygon points='470,0 510,0 495,420 455,420' fill='%23e8e8ec'/%3E%3Cpolygon points='560,0 610,0 595,420 545,420' fill='%23dddde3' opacity='.7'/%3E%3Cpolygon points='100,0 115,0 88,420 73,420' fill='%23d0d0d8' opacity='.4'/%3E%3Cpolygon points='230,0 242,0 220,420 208,420' fill='%23d0d0d8' opacity='.35'/%3E%3Cpolygon points='330,0 341,0 322,420 311,420' fill='%23c4c4ce' opacity='.3'/%3E%3Cpolygon points='0,0 55,0 30,420 0,420' fill='%23c0392b' opacity='.1'/%3E%3Cpolygon points='640,0 680,0 680,420 660,420' fill='%23e74c3c' opacity='.06'/%3E%3Cpolygon points='310,0 355,0 338,420 293,420' fill='%23e74c3c' opacity='.06'/%3E%3Cpolygon points='0,0 120,0 0,160' fill='%23d0d0d8' opacity='.2'/%3E%3Cpolygon points='680,420 560,420 680,260' fill='%23d0d0d8' opacity='.2'/%3E%3Ccircle cx='0' cy='0' r='80' fill='none' stroke='%23c0c0cc' stroke-width='.5' opacity='.3'/%3E%3Ccircle cx='680' cy='420' r='90' fill='none' stroke='%23c4c4ce' stroke-width='.5' opacity='.25'/%3E%3Cline x1='0' y1='120' x2='680' y2='65' stroke='%23c0c0cc' stroke-width='.5' opacity='.5'/%3E%3Cline x1='0' y1='280' x2='680' y2='225' stroke='%23d0d0d8' stroke-width='.3' opacity='.4'/%3E%3Cline x1='0' y1='80' x2='680' y2='40' stroke='%23c0392b' stroke-width='.7' opacity='.12'/%3E%3Cline x1='0' y1='360' x2='680' y2='320' stroke='%23c0392b' stroke-width='.7' opacity='.1'/%3E%3C/svg%3E");
+  background-color: #e2e2e8;
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 680 420'><rect width='680' height='420' fill='%23e2e2e8'/><!-- Grande masse sombre gauche --><path d='M-40,80 C60,20 140,100 120,200 C100,300 20,360 -40,420' fill='%23b8b8c8' opacity='.7'/><path d='M720,50 C640,90 580,40 560,140 C540,240 600,300 720,320' fill='%23adadbf' opacity='.6'/><path d='M160,-30 C220,60 300,30 360,80 C420,130 380,200 300,180 C220,160 180,100 160,-30' fill='%23c4c4d2' opacity='.55'/><path d='M-20,320 C80,260 200,340 320,290 C440,240 560,310 720,280 L720,500 L-20,500 Z' fill='%23b0b0c4' opacity='.45'/><path d='M480,0 C520,60 560,40 620,100 C660,140 700,100 720,80' fill='none' stroke='%239898b0' stroke-width='28' opacity='.35' stroke-linecap='round'/><ellipse cx='-30' cy='380' rx='160' ry='100' fill='%23a8a8bc' opacity='.5'/><ellipse cx='340' cy='160' rx='180' ry='90' fill='%23cacad8' opacity='.35' transform='rotate(-12,340,160)'/><path d='M-10,160 C100,120 200,200 280,150 C360,100 420,180 500,140' fill='none' stroke='%23a0a0b8' stroke-width='45' opacity='.25' stroke-linecap='round'/><path d='M600,500 C580,380 660,320 720,280' fill='none' stroke='%239090a8' stroke-width='60' opacity='.3' stroke-linecap='round'/><polygon points='-20,0 120,0 80,180 -20,200' fill='%23b4b4c6' opacity='.4'/><polygon points='600,420 720,420 720,250 660,280' fill='%23ababbe' opacity='.35'/><path d='M280,420 L400,180 L520,420' fill='none' stroke='%239898b2' stroke-width='1.5' opacity='.4'/><path d='M-20,0 C30,40 10,120 -20,160' fill='%23b83028' opacity='.18'/><path d='M720,240 C680,280 700,360 720,400' fill='%23c84038' opacity='.12'/><path d='M200,420 C260,370 340,400 400,380 C460,360 520,380 560,420' fill='none' stroke='%23b03020' stroke-width='2' opacity='.14'/><circle cx='340' cy='210' r='220' fill='none' stroke='%23a8a8bc' stroke-width='1' opacity='.25'/><circle cx='80' cy='60' r='80' fill='none' stroke='%23b0b0c4' stroke-width='.8' opacity='.3'/><line x1='-10' y1='0' x2='690' y2='420' stroke='%23b03020' stroke-width='.8' opacity='.1'/></svg>");
   background-size: cover;
   background-attachment: fixed;
 }
