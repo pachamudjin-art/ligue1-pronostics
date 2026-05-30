@@ -318,7 +318,17 @@ async def journee(request: Request, season_id: int, number: int):
     for m in matches:
         if match_is_locked(m) or read_only:
             rows = qall(conn, "SELECT p.*, u.username FROM pronostics p JOIN users u ON u.id=p.user_id WHERE p.match_id=%s", (m["id"],))
-            all_pronostics[m["id"]] = [dict(r) for r in rows]
+            enriched = []
+            for r in rows:
+                d = dict(r)
+                # Calculer le label du pronostic si résultat connu
+                if m["home_score"] is not None and m["away_score"] is not None:
+                    result = compute_points(m["home_score"], m["away_score"], d["home_score"], d["away_score"])
+                    d["label"] = result["label"]
+                else:
+                    d["label"] = ""
+                enriched.append(d)
+            all_pronostics[m["id"]] = enriched
 
     points_by_match = {}
     for m in matches:
