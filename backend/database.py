@@ -101,6 +101,15 @@ def init_db():
             created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'),
             updated_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'),
             UNIQUE(user_id, season_id))""",
+        # Table Hall of Fame
+        """CREATE TABLE IF NOT EXISTS hall_of_fame (
+            id SERIAL PRIMARY KEY,
+            type TEXT NOT NULL,
+            num INTEGER NOT NULL,
+            saison TEXT NOT NULL,
+            joueur TEXT NOT NULL,
+            points INTEGER,
+            created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
         # Table résultat podium réel
         """CREATE TABLE IF NOT EXISTS podium_results (
             id SERIAL PRIMARY KEY,
@@ -117,6 +126,10 @@ def init_db():
         "ALTER TABLE seasons ADD COLUMN IF NOT EXISTS competition_type TEXT DEFAULT 'league'",
         "ALTER TABLE seasons ADD COLUMN IF NOT EXISTS api_code TEXT DEFAULT 'FL1'",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'ligue1'",
+        """CREATE TABLE IF NOT EXISTS hall_of_fame (
+            id SERIAL PRIMARY KEY, type TEXT NOT NULL, num INTEGER NOT NULL,
+            saison TEXT NOT NULL, joueur TEXT NOT NULL, points INTEGER,
+            created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
     ]
     for m in migrations:
         try: c.execute(m)

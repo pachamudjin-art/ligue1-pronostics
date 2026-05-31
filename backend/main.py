@@ -969,61 +969,79 @@ async def giphy_search(request: Request, q_param: str = ""):
 
 # ─── Hall of Fame ────────────────────────────────────────────────────────────
 
-HALL_OF_FAME = {
-    "champions": [
-        {"num": 1,  "saison": "2010-2011", "joueur": "Ricardo",  "points": 412},
-        {"num": 2,  "saison": "2011-2012", "joueur": "Ricardo",  "points": 578},
-        {"num": 3,  "saison": "2012-2013", "joueur": "Seb",      "points": 562},
-        {"num": 4,  "saison": "2013-2014", "joueur": "Coach",    "points": 582},
-        {"num": 5,  "saison": "2014-2015", "joueur": "Seb",      "points": 632},
-        {"num": 6,  "saison": "2015-2016", "joueur": "Mathieu",  "points": 554},
-        {"num": 7,  "saison": "2016-2017", "joueur": "Mathieu",  "points": 645},
-        {"num": 8,  "saison": "2017-2018", "joueur": "Mathieu",  "points": 587},
-        {"num": 9,  "saison": "2018-2019", "joueur": "Ricardo",  "points": 529},
-        {"num": 10, "saison": "2019-2020", "joueur": "Mathieu",  "points": 447},
-        {"num": 11, "saison": "2020-2021", "joueur": "Ricardo",  "points": 546},
-        {"num": 12, "saison": "2021-2022", "joueur": "Ricardo",  "points": 595},
-        {"num": 13, "saison": "2022-2023", "joueur": "Seb",      "points": 602},
-        {"num": 14, "saison": "2023-2024", "joueur": "Ben",      "points": 450},
-        {"num": 15, "saison": "2024-2025", "joueur": "Seb",      "points": None},
-        {"num": 16, "saison": "2025-2026", "joueur": "Seb",      "points": None},
-    ],
-    "cuilleres": [
-        {"num": 1,  "saison": "2010-2011", "joueur": "Seb",      "points": 388},
-        {"num": 2,  "saison": "2011-2012", "joueur": "Dreux",    "points": 473},
-        {"num": 3,  "saison": "2012-2013", "joueur": "Dreux",    "points": 498},
-        {"num": 4,  "saison": "2013-2014", "joueur": "Dreux",    "points": 492},
-        {"num": 5,  "saison": "2014-2015", "joueur": "Dreux",    "points": 492},
-        {"num": 6,  "saison": "2015-2016", "joueur": "Coach",    "points": 478},
-        {"num": 7,  "saison": "2016-2017", "joueur": "Dreux",    "points": 458},
-        {"num": 8,  "saison": "2017-2018", "joueur": "Le Doubs", "points": 478},
-        {"num": 9,  "saison": "2018-2019", "joueur": "Greg",     "points": 469},
-        {"num": 10, "saison": "2019-2020", "joueur": "Le Doubs", "points": 329},
-        {"num": 11, "saison": "2020-2021", "joueur": "Le Doubs", "points": 479},
-        {"num": 12, "saison": "2021-2022", "joueur": "Dreux",    "points": 483},
-        {"num": 13, "saison": "2022-2023", "joueur": "Le Doubs", "points": 515},
-        {"num": 14, "saison": "2023-2024", "joueur": "Le Doubs", "points": 341},
-        {"num": 15, "saison": "2024-2025", "joueur": "Le Doubs", "points": None},
-        {"num": 16, "saison": "2025-2026", "joueur": "Coach",    "points": None},
-    ],
-}
+HOF_SEED = [
+    # (type, num, saison, joueur, points)
+    ("champions", 1,  "2010-2011", "Ricardo",     412),
+    ("champions", 2,  "2011-2012", "Ricardo",     578),
+    ("champions", 3,  "2012-2013", "Seb",         562),
+    ("champions", 4,  "2013-2014", "Coach",       582),
+    ("champions", 5,  "2014-2015", "Seb",         632),
+    ("champions", 6,  "2015-2016", "Mathieu",     554),
+    ("champions", 7,  "2016-2017", "Mathieu",     645),
+    ("champions", 8,  "2017-2018", "Mathieu",     587),
+    ("champions", 9,  "2018-2019", "Ricardo",     529),
+    ("champions", 10, "2019-2020", "Mathieu",     447),
+    ("champions", 11, "2020-2021", "Ricardo",     546),
+    ("champions", 12, "2021-2022", "Ricardo",     595),
+    ("champions", 13, "2022-2023", "Seb",         602),
+    ("champions", 14, "2023-2024", "Ben",         450),
+    ("champions", 15, "2024-2025", "Seb",         None),
+    ("champions", 16, "2025-2026", "Seb",         None),
+    ("cuilleres", 1,  "2010-2011", "Seb",         388),
+    ("cuilleres", 2,  "2011-2012", "Dreux",       473),
+    ("cuilleres", 3,  "2012-2013", "Dreux",       498),
+    ("cuilleres", 4,  "2013-2014", "Dreux",       492),
+    ("cuilleres", 5,  "2014-2015", "Dreux",       492),
+    ("cuilleres", 6,  "2015-2016", "Coach",       478),
+    ("cuilleres", 7,  "2016-2017", "Dreux",       458),
+    ("cuilleres", 8,  "2017-2018", "Le Doubs",    478),
+    ("cuilleres", 9,  "2018-2019", "Greg",        469),
+    ("cuilleres", 10, "2019-2020", "Le Doubs",    329),
+    ("cuilleres", 11, "2020-2021", "Le Doubs",    479),
+    ("cuilleres", 12, "2021-2022", "Dreux",       483),
+    ("cuilleres", 13, "2022-2023", "Le Doubs",    515),
+    ("cuilleres", 14, "2023-2024", "Le Doubs",    341),
+    ("cuilleres", 15, "2024-2025", "Le Doubs",    None),
+    ("cuilleres", 16, "2025-2026", "Coach",       None),
+]
+
+def seed_hall_of_fame():
+    """Insère les données historiques si la table est vide."""
+    conn = get_db()
+    count = qone(conn, "SELECT COUNT(*) as cnt FROM hall_of_fame")
+    if count and count["cnt"] > 0:
+        release_db(conn)
+        return
+    for t, num, saison, joueur, points in HOF_SEED:
+        q(conn, "INSERT INTO hall_of_fame (type, num, saison, joueur, points) VALUES (%s,%s,%s,%s,%s)",
+          (t, num, saison, joueur, points))
+    conn.commit()
+    release_db(conn)
+    print("Hall of Fame initialisé.")
 
 @app.get("/hall-of-fame", response_class=HTMLResponse)
 async def hall_of_fame(request: Request):
     user = get_current_user(request)
     if not user: return RedirectResponse("/login", status_code=303)
     season = get_active_season()
+    conn = get_db()
+
+    champions = [dict(r) for r in qall(conn,
+        "SELECT * FROM hall_of_fame WHERE type='champions' ORDER BY num")]
+    cuilleres = [dict(r) for r in qall(conn,
+        "SELECT * FROM hall_of_fame WHERE type='cuilleres' ORDER BY num")]
+    release_db(conn)
 
     from collections import Counter
-    champ_count = Counter(c["joueur"] for c in HALL_OF_FAME["champions"])
-    cuil_count  = Counter(c["joueur"] for c in HALL_OF_FAME["cuilleres"])
+    champ_count = dict(sorted(Counter(c["joueur"] for c in champions).items(), key=lambda x: -x[1]))
+    cuil_count  = dict(sorted(Counter(c["joueur"] for c in cuilleres).items(),  key=lambda x: -x[1]))
 
     return templates.TemplateResponse("hall_of_fame.html", {
         "request": request, "user": user, "season": season,
-        "champions": list(reversed(HALL_OF_FAME["champions"])),
-        "cuilleres": list(reversed(HALL_OF_FAME["cuilleres"])),
-        "champ_count": dict(sorted(champ_count.items(), key=lambda x: -x[1])),
-        "cuil_count":  dict(sorted(cuil_count.items(),  key=lambda x: -x[1])),
+        "champions": list(reversed(champions)),
+        "cuilleres": list(reversed(cuilleres)),
+        "champ_count": champ_count,
+        "cuil_count": cuil_count,
     })
 
 @app.post("/admin/hall-of-fame/add")
@@ -1035,13 +1053,13 @@ async def admin_add_hof(
     points: str = Form(""),
 ):
     require_admin(request)
-    entry = {
-        "num": len(HALL_OF_FAME[type]) + 1,
-        "saison": saison,
-        "joueur": joueur,
-        "points": int(points) if points.strip() else None,
-    }
-    HALL_OF_FAME[type].append(entry)
+    conn = get_db()
+    count = qone(conn, "SELECT COUNT(*) as cnt FROM hall_of_fame WHERE type=%s", (type,))
+    num = (count["cnt"] or 0) + 1
+    q(conn, "INSERT INTO hall_of_fame (type, num, saison, joueur, points) VALUES (%s,%s,%s,%s,%s)",
+      (type, num, saison, joueur, int(points) if points.strip() else None))
+    conn.commit()
+    release_db(conn)
     return RedirectResponse("/hall-of-fame", status_code=303)
 
 
@@ -1188,6 +1206,27 @@ async def admin_debug(request: Request):
     <p style="color:#8b949e;font-size:.8rem">UTC : {utcnow_str()}</p>
     </body></html>"""
     return HTMLResponse(html)
+
+@app.get("/admin/fix-team-names")
+async def admin_fix_team_names(request: Request):
+    require_admin(request)
+    conn = get_db()
+    fixes = [
+        ("Bonsia H.", "Bosnie H."),
+        ("Bosnia H.", "Bosnie H."),
+        ("Jordan", "Jordanie"),
+        ("Congo RD", "RD Congo"),
+    ]
+    total = 0
+    for old_name, new_name in fixes:
+        r = q(conn, "UPDATE matches SET home_team=%s WHERE home_team=%s", (new_name, old_name))
+        total += r.rowcount
+        r = q(conn, "UPDATE matches SET away_team=%s WHERE away_team=%s", (new_name, old_name))
+        total += r.rowcount
+    conn.commit()
+    release_db(conn)
+    return JSONResponse({"ok": True, "updated": total, "fixes": [f[1] for f in fixes]})
+
 
 @app.get("/admin/test-api")
 async def admin_test_api(request: Request):
