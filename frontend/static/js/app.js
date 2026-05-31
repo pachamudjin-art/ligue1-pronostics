@@ -554,3 +554,32 @@ async function importOds() {
   }
   if (btn) { btn.disabled = false; btn.textContent = "📋 Importer pronostics LibreOffice"; }
 }
+
+
+// ── Pronostic Podium ─────────────────────────────────────────
+async function submitPodium(e, seasonId) {
+  e.preventDefault();
+  const formId = e.target.id;
+  const form = document.getElementById(formId);
+  const fd = new FormData(form);
+  fd.set("season_id", seasonId);
+  const vals = [fd.get("rank1"), fd.get("rank2"), fd.get("rank3")];
+  if (vals.some(v => !v)) {
+    toast("Choisissez les 3 équipes du podium", "err"); return;
+  }
+  if (new Set(vals).size < 3) {
+    toast("Vous ne pouvez pas pronostiquer la même équipe deux fois !", "err"); return;
+  }
+  try {
+    const res = await fetch("/podium/submit", {method:"POST", body:fd});
+    const data = await res.json();
+    if (data.ok) {
+      toast("✓ Pronostic podium enregistré !", "ok");
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      toast(data.error || "Erreur", "err");
+    }
+  } catch(e) {
+    toast("Erreur réseau", "err");
+  }
+}
