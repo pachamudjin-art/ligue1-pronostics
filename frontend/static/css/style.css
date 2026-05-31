@@ -19,13 +19,27 @@
   --shadow:    0 4px 24px rgba(0,0,0,.5);
 }
 
+/* Fond texturé thème Ligue 1 (défaut) */
+body[data-theme="ligue1"], body:not([data-theme]) {
+  background-image:
+    radial-gradient(ellipse at 15% 25%, rgba(232,196,90,.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 75%, rgba(192,57,43,.06) 0%, transparent 50%),
+    repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 40px,
+      rgba(255,255,255,.012) 40px,
+      rgba(255,255,255,.012) 41px
+    );
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html { font-size: 16px; scroll-behavior: smooth; }
 
 body {
   font-family: 'DM Sans', sans-serif;
-  background: var(--bg);
+  background-color: var(--bg);
   color: var(--text);
   min-height: 100vh;
   line-height: 1.5;
@@ -1061,9 +1075,23 @@ input[type=time].admin-in:focus {
 [data-theme="ardoise"] body {
   background-color: #1a1a1a;
   background-image:
-    radial-gradient(ellipse at 20% 20%, rgba(80,80,80,.15) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, rgba(60,60,60,.15) 0%, transparent 50%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    radial-gradient(ellipse at 20% 20%, rgba(80,80,80,.2) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 80%, rgba(60,60,60,.2) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(40,40,40,.1) 0%, transparent 70%),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255,255,255,.015) 2px,
+      rgba(255,255,255,.015) 3px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 2px,
+      rgba(255,255,255,.01) 2px,
+      rgba(255,255,255,.01) 3px
+    );
 }
 [data-theme="ardoise"] nav {
   background: rgba(25,25,25,.95);
