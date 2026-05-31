@@ -917,18 +917,18 @@ body[data-theme="nuit-bleue"] nav { border-bottom-color: var(--accent); }
 
 /* ── Rouge Passion ──────────────────────────────────────────── */
 body[data-theme="rouge-passion"] {
-  --bg:        #0f0a0a;
-  --surface:   #1a0f0f;
-  --surface2:  #2a1515;
-  --border:    #4a2020;
-  --accent:    #f87171;
-  --accent2:   #ef4444;
-  --text:      #fef2f2;
-  --muted:     #b0807e;
-  --green:     #4ade80;
+  --bg:        #18100f;
+  --surface:   #231815;
+  --surface2:  #2e201c;
+  --border:    #4a2e28;
+  --accent:    #e8998a;
+  --accent2:   #c0614f;
+  --text:      #f5ece8;
+  --muted:     #9e7e78;
+  --green:     #5dba8a;
 }
 body[data-theme="rouge-passion"] .nav-brand { color: var(--accent); }
-body[data-theme="rouge-passion"] nav { border-bottom-color: var(--accent); }
+body[data-theme="rouge-passion"] nav { border-bottom-color: var(--accent2); }
 
 /* ── Néon ───────────────────────────────────────────────────── */
 body[data-theme="neon"] {
@@ -1020,29 +1020,11 @@ body[data-theme="terrain"] {
   --shadow:    0 4px 24px rgba(0,0,0,.6);
 }
 body[data-theme="terrain"] {
-  background-color: #0a1f0a;
-  background-image:
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 60px,
-      rgba(255,255,255,.02) 60px,
-      rgba(255,255,255,.02) 61px
-    ),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 60px,
-      rgba(255,255,255,.02) 60px,
-      rgba(255,255,255,.02) 61px
-    ),
-    repeating-linear-gradient(
-      0deg,
-      rgba(20,80,20,.4),
-      rgba(20,80,20,.4) 40px,
-      rgba(10,50,10,.4) 40px,
-      rgba(10,50,10,.4) 80px
-    );
+  background-color: #050a08;
+  background-image: url("data:image/svg+xml,<svg viewBox='0 0 680 420' xmlns='http://www.w3.org/2000/svg'><defs><radialGradient id='nightSky' cx='50%25' cy='50%25' r='70%25'><stop offset='0%25' stop-color='%230d1520'/><stop offset='100%25' stop-color='%23020508'/></radialGradient><radialGradient id='pitchGlow' cx='50%25' cy='50%25' r='60%25'><stop offset='0%25' stop-color='%232a8c32'/><stop offset='60%25' stop-color='%231e6b24'/><stop offset='100%25' stop-color='%23124018'/></radialGradient><radialGradient id='outerGlow' cx='50%25' cy='50%25' r='50%25'><stop offset='0%25' stop-color='%231a3a80' stop-opacity='0.5'/><stop offset='100%25' stop-color='%230a1840' stop-opacity='0'/></radialGradient><clipPath id='stadClip'><ellipse cx='340' cy='210' rx='265' ry='195'/></clipPath></defs><rect width='680' height='420' fill='url(%23nightSky)'/><g fill='%23fff'><circle cx='30' cy='20' r='0.7' opacity='0.6'/><circle cx='160' cy='28' r='0.8' opacity='0.55'/><circle cx='320' cy='18' r='0.7' opacity='0.6'/><circle cx='510' cy='24' r='0.8' opacity='0.55'/><circle cx='650' cy='30' r='0.7' opacity='0.6'/><circle cx='90' cy='12' r='0.5' opacity='0.5'/><circle cx='240' cy='8' r='0.6' opacity='0.5'/><circle cx='420' cy='10' r='0.6' opacity='0.5'/><circle cx='590' cy='14' r='0.5' opacity='0.5'/></g><ellipse cx='340' cy='210' rx='290' ry='215' fill='url(%23outerGlow)'/><ellipse cx='340' cy='215' rx='295' ry='218' fill='%230e1520' stroke='%231a2540' stroke-width='12'/><ellipse cx='344' cy='218' rx='268' ry='198' fill='%23000' opacity='0.4'/><ellipse cx='340' cy='210' rx='265' ry='195' fill='%230e1830'/><ellipse cx='340' cy='210' rx='265' ry='195' fill='none' stroke='%232050c0' stroke-width='3' opacity='0.7'/><ellipse cx='340' cy='210' rx='255' ry='185' fill='%230c1525'/><ellipse cx='340' cy='210' rx='240' ry='172' fill='%23101c30'/><ellipse cx='340' cy='210' rx='235' ry='168' fill='%230e1828'/><g stroke='%231a2840' stroke-width='1.5' fill='none' opacity='0.8'><ellipse cx='340' cy='210' rx='230' ry='163'/><ellipse cx='340' cy='210' rx='220' ry='155'/><ellipse cx='340' cy='210' rx='210' ry='147'/><ellipse cx='340' cy='210' rx='200' ry='139'/><ellipse cx='340' cy='210' rx='190' ry='131'/><ellipse cx='340' cy='210' rx='180' ry='123'/></g><ellipse cx='340' cy='210' rx='227' ry='161' fill='none' stroke='%23c0392b' stroke-width='2' opacity='0.2'/><ellipse cx='340' cy='210' rx='217' ry='153' fill='none' stroke='%231a3060' stroke-width='2' opacity='0.25'/><ellipse cx='340' cy='210' rx='207' ry='145' fill='none' stroke='%23c0392b' stroke-width='1.5' opacity='0.15'/><ellipse cx='340' cy='210' rx='197' ry='137' fill='none' stroke='%23ffffff' stroke-width='1' opacity='0.06'/><ellipse cx='340' cy='210' rx='187' ry='129' fill='none' stroke='%231a3060' stroke-width='1.5' opacity='0.2'/><ellipse cx='340' cy='210' rx='177' ry='121' fill='none' stroke='%23c0392b' stroke-width='1.5' opacity='0.15'/><ellipse cx='340' cy='210' rx='172' ry='118' fill='url(%23pitchGlow)'/><g clip-path='url(%23stadClip)'><rect x='168' y='92' width='344' height='23' fill='%231a5c20' opacity='0.5'/><rect x='168' y='138' width='344' height='23' fill='%231a5c20' opacity='0.5'/><rect x='168' y='184' width='344' height='23' fill='%231a5c20' opacity='0.5'/><rect x='168' y='230' width='344' height='23' fill='%231a5c20' opacity='0.5'/><rect x='168' y='276' width='344' height='23' fill='%231a5c20' opacity='0.5'/><rect x='168' y='322' width='344' height='23' fill='%231a5c20' opacity='0.5'/></g><g stroke='%2390e898' stroke-width='1.2' fill='none' opacity='0.8'><rect x='178' y='108' width='324' height='204'/><line x1='340' y1='108' x2='340' y2='312'/><circle cx='340' cy='210' r='32'/><circle cx='340' cy='210' r='2.5' fill='%2390e898'/><rect x='178' y='163' width='72' height='94'/><rect x='178' y='183' width='26' height='54'/><path d='M250,175 A32,32 0 0 1 250,245'/><rect x='450' y='163' width='72' height='94'/><rect x='496' y='183' width='26' height='54'/><path d='M430,175 A32,32 0 0 0 430,245'/><circle cx='226' cy='210' r='2' fill='%2390e898'/><circle cx='454' cy='210' r='2' fill='%2390e898'/></g><g stroke='%23fff' stroke-width='1.8' fill='none' opacity='0.7'><rect x='163' y='196' width='15' height='28'/><rect x='502' y='196' width='15' height='28'/></g><g fill='%23fffbe0' opacity='0.9'><circle cx='280' cy='20' r='3'/><circle cx='310' cy='17' r='3.5'/><circle cx='340' cy='16' r='3'/><circle cx='370' cy='17' r='3.5'/><circle cx='400' cy='20' r='3'/><circle cx='200' cy='38' r='3'/><circle cx='155' cy='65' r='3.5'/><circle cx='118' cy='100' r='3'/><circle cx='480' cy='38' r='3'/><circle cx='525' cy='65' r='3.5'/><circle cx='562' cy='100' r='3'/><circle cx='88' cy='148' r='3.5'/><circle cx='76' cy='185' r='3'/><circle cx='76' cy='220' r='3.5'/><circle cx='88' cy='258' r='3'/><circle cx='592' cy='148' r='3.5'/><circle cx='604' cy='185' r='3'/><circle cx='604' cy='220' r='3.5'/><circle cx='592' cy='258' r='3'/><circle cx='118' cy='300' r='3'/><circle cx='155' cy='335' r='3.5'/><circle cx='200' cy='358' r='3'/><circle cx='562' cy='300' r='3'/><circle cx='525' cy='335' r='3.5'/><circle cx='480' cy='358' r='3'/><circle cx='280' cy='374' r='3'/><circle cx='310' cy='378' r='3.5'/><circle cx='340' cy='379' r='3'/><circle cx='370' cy='378' r='3.5'/><circle cx='400' cy='374' r='3'/></g><ellipse cx='340' cy='210' rx='264' ry='194' fill='none' stroke='%234090ff' stroke-width='2' opacity='0.5'/><ellipse cx='340' cy='210' rx='264' ry='194' fill='none' stroke='%2380c0ff' stroke-width='1' opacity='0.3'/></svg>");
+  background-size: cover;
+  background-attachment: fixed;
+  background-position: center;
 }
 body[data-theme="terrain"] nav {
   background: rgba(5,20,5,.9);
