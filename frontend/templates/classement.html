@@ -7,13 +7,18 @@
   <!-- Sélecteur de saison -->
   {% if all_seasons|length > 1 %}
   <div style="display:flex; align-items:center; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap;">
-    <span style="font-size:.8rem; color:var(--muted);">Saison :</span>
-    {% for s in all_seasons %}
-    <a href="/saison/{{ s.id }}/classement"
-       class="btn btn-sm {% if s.id == season.id %}btn-primary{% else %}btn-secondary{% endif %}">
-      {{ s.name }}{% if s.is_active %} ★{% endif %}
-    </a>
-    {% endfor %}
+    <span style="font-size:.8rem; color:var(--muted); white-space:nowrap;">Compétition :</span>
+    <select onchange="window.location.href=this.value"
+            style="background:var(--surface2); border:1px solid var(--border); color:var(--text);
+                   padding:.4rem .8rem; border-radius:7px; font-family:'DM Sans',sans-serif;
+                   font-size:.88rem; cursor:pointer; outline:none; flex:1; max-width:280px;">
+      {% for s in all_seasons %}
+      <option value="/saison/{{ s.id }}/classement"
+              {% if s.id == season.id %}selected{% endif %}>
+        {{ s.name }}{% if s.is_active %} ★{% endif %}
+      </option>
+      {% endfor %}
+    </select>
   </div>
   {% endif %}
 

@@ -16,9 +16,6 @@
     {% if season %}
     <a href="/saison/{{ season.id }}/journee/1" {% if request.url.path.startswith('/saison') and '/journee/' in request.url.path %}class="active"{% endif %}>Journées</a>
     <a href="/saison/{{ season.id }}/classement" {% if '/classement' in request.url.path %}class="active"{% endif %}>Classement</a>
-    {% if season.competition_type == 'cup' %}
-    <a href="/saison/{{ season.id }}/podium" {% if '/podium' in request.url.path %}class="active"{% endif %}>🏅 Podium</a>
-    {% endif %}
     {% else %}
     <a href="/">Journées</a>
     <a href="/classement">Classement</a>
