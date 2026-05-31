@@ -96,7 +96,7 @@
                  value="{{ current }}" placeholder="{{ label }}" required>
           {% endif %}
           {% endfor %}
-          <button type="submit" class="btn btn-primary btn-sm">✓ Valider</button>
+          <button type="submit" class="btn btn-primary btn-sm">{% if my_podium %}✎ Modifier{% else %}✓ Valider{% endif %}</button>
         </div>
       </form>
       <p style="font-size:.75rem; color:var(--muted);">Verrouillé au coup d'envoi du 1er match · Bonus : vainqueur=10pts, bonne place=5pts, podium=3pts</p>

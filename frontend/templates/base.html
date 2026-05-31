@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Ligue 1 Pronostics{% endblock %}</title>
+  <title>{% block title %}Championnat des pronos - ENTE{% endblock %}</title>
   <link rel="stylesheet" href="/static/css/style.css">
   {% block head %}{% endblock %}
 </head>
@@ -11,15 +11,19 @@
 
 {% if user %}
 <nav>
-  <a class="nav-brand" href="/">⚽ L1 PRONOSTICS</a>
+  <a class="nav-brand" href="/">🏆 PRONOS ENTE</a>
   <div class="nav-links">
     {% if season %}
     <a href="/saison/{{ season.id }}/journee/1" {% if request.url.path.startswith('/saison') and '/journee/' in request.url.path %}class="active"{% endif %}>Journées</a>
     <a href="/saison/{{ season.id }}/classement" {% if '/classement' in request.url.path %}class="active"{% endif %}>Classement</a>
+    {% if season.competition_type == 'cup' %}
+    <a href="/saison/{{ season.id }}/podium" {% if '/podium' in request.url.path %}class="active"{% endif %}>🏅 Podium</a>
+    {% endif %}
     {% else %}
     <a href="/">Journées</a>
     <a href="/classement">Classement</a>
     {% endif %}
+    <a href="/hall-of-fame" {% if request.url.path == '/hall-of-fame' %}class="active"{% endif %}>🏆 Hall of Fame</a>
     {% if user.is_admin %}
     <a href="/admin" {% if request.url.path.startswith('/admin') %}class="active"{% endif %}>⚙ Admin</a>
     {% endif %}
@@ -32,23 +36,17 @@
 </nav>
 
 <!-- ── Chat flottant ───────────────────────────────────────── -->
-<!-- Bouton d'ouverture -->
 <button id="chat-fab" onclick="toggleChat()" title="Vestiaire">
   💬
   <span id="chat-notif" class="chat-notif" style="display:none"></span>
 </button>
 
-<!-- Panneau latéral -->
 <div id="chat-panel" class="chat-panel">
   <div class="chat-panel-header">
     <span>💬 Vestiaire</span>
     <button onclick="toggleChat()" class="chat-close-btn">✕</button>
   </div>
-
-  <!-- Messages -->
   <div id="chat-box" class="chat-panel-messages"></div>
-
-  <!-- Sélecteur émojis -->
   <div id="emoji-picker" class="emoji-picker" style="display:none">
     <div class="emoji-grid">
       {% set emojis = ["😀","😂","🤣","😍","🥰","😎","🤩","😭","😤","🤬","👍","👎","👏","🙌","🤝","💪","🎯","🔥","💥","⚽","🏆","🥇","🎉","🎊","👑","😱","🤔","😴","🤤","😋","🤭","🙄","😅","😬","🫡","🤡","💩","👻","🎭","🍾","🍻","🫶","❤️","💛","💙","🖤","⭐","✨","💫","🌟"] %}
@@ -57,15 +55,11 @@
       {% endfor %}
     </div>
   </div>
-
-  <!-- Recherche GIFs -->
   <div id="gif-picker" class="gif-picker" style="display:none">
     <input type="text" id="gif-search" class="gif-search-input" placeholder="Rechercher un GIF…"
            oninput="searchGifs(this.value)">
     <div id="gif-results" class="gif-results"></div>
   </div>
-
-  <!-- Zone de saisie -->
   <div class="chat-panel-input">
     <div class="chat-input-toolbar">
       <button class="chat-tool-btn" onclick="toggleEmojiPicker()" title="Émojis">😊</button>
@@ -78,8 +72,6 @@
     </div>
   </div>
 </div>
-
-<!-- Overlay sombre sur mobile -->
 <div id="chat-overlay" class="chat-overlay" onclick="toggleChat()"></div>
 
 {% endif %}
@@ -90,7 +82,6 @@
 <script src="/static/js/app.js"></script>
 {% if user %}
 <script>
-  // Initialisation du chat avec le nom du joueur connecté
   window.CHAT_USER = "{{ user.username }}";
   window.CHAT_IS_ADMIN = {{ 'true' if user.is_admin else 'false' }};
   initFloatingChat();
