@@ -874,24 +874,129 @@ input[type=time].admin-in:focus {
 }
 .chat-overlay.open { display: block; }
 
+/* ── Réactions chat ──────────────────────────────────────────── */
+.reactions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem;
+  margin-top: .3rem;
+  align-items: center;
+}
+
+.react-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .2rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: .1rem .45rem;
+  font-size: .78rem;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .1s;
+  color: var(--text);
+}
+.react-chip:hover {
+  background: var(--surface);
+  border-color: var(--accent);
+  transform: scale(1.08);
+}
+.react-chip.mine {
+  background: rgba(232,196,90,.12);
+  border-color: rgba(232,196,90,.4);
+}
+.react-chip span {
+  font-size: .72rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.react-add-btn {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 20px;
+  padding: .1rem .4rem;
+  font-size: .78rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .15s;
+  line-height: 1;
+}
+.react-add-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.react-picker {
+  display: none;
+  flex-wrap: wrap;
+  gap: .2rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: .4rem .5rem;
+  margin-top: .25rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  position: relative;
+  z-index: 10;
+}
+.react-picker button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: .2rem;
+  border-radius: 6px;
+  transition: transform .1s, background .1s;
+  line-height: 1;
+}
+.react-picker button:hover {
+  transform: scale(1.3);
+  background: var(--surface2);
+}
+
 /* Mobile : panneau plein écran */
 @media (max-width: 480px) {
-  .chat-panel { width: 100vw; right: -100vw; }
+  .chat-panel {
+    width: 100vw;
+    right: -100vw;
+    /* Compatibilité Firefox mobile : utiliser -webkit-fill-available en fallback */
+    height: 100vh;
+    height: -webkit-fill-available;
+    height: 100dvh;
+    /* Forcer le layout flex en colonne */
+    display: flex;
+    flex-direction: column;
+  }
   .chat-panel.open { right: 0; }
 
-  /* Fixer la zone de saisie en bas même quand le clavier est ouvert */
-  .chat-panel {
-    height: 100%;
-    height: 100dvh; /* dynamic viewport height — s'adapte au clavier */
-  }
   .chat-panel-messages {
-    flex: 1;
-    min-height: 0; /* important pour que flex fonctionne */
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
+
   .chat-panel-input {
-    position: sticky;
-    bottom: 0;
     flex-shrink: 0;
+    position: relative;
+    /* Firefox mobile : s'assurer que l'input reste visible */
+    bottom: auto;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Firefox : forcer la zone de saisie visible quand clavier ouvert */
+  @supports (-moz-appearance: none) {
+    .chat-panel {
+      height: 100vh;
+      max-height: 100vh;
+    }
+    .chat-panel-input {
+      position: sticky;
+      bottom: 0;
+      z-index: 10;
+      background: var(--surface2);
+    }
   }
 }
 
@@ -983,7 +1088,41 @@ body[data-theme="glassmorphism"] {
   --green:     #4ade80;
 }
 body[data-theme="glassmorphism"] {
-  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+  background-color: #111827;
+  background-image:
+    /* Grandes bulles lumineuses — effet verre -->*/
+    radial-gradient(ellipse at 10% 15%, rgba(100,170,255,.18) 0%, transparent 40%),
+    radial-gradient(ellipse at 88% 12%, rgba(150,200,255,.14) 0%, transparent 38%),
+    radial-gradient(ellipse at 55% 72%, rgba(80,140,255,.16) 0%, transparent 45%),
+    radial-gradient(ellipse at 20% 85%, rgba(140,190,255,.12) 0%, transparent 38%),
+    radial-gradient(ellipse at 92% 60%, rgba(100,130,230,.14) 0%, transparent 35%),
+    radial-gradient(ellipse at 45% 35%, rgba(180,210,255,.06) 0%, transparent 30%),
+    /* Reflets diagonaux — rayures verre -->*/
+    repeating-linear-gradient(
+      125deg,
+      transparent,
+      transparent 60px,
+      rgba(255,255,255,.025) 60px,
+      rgba(255,255,255,.025) 61px
+    ),
+    repeating-linear-gradient(
+      55deg,
+      transparent,
+      transparent 80px,
+      rgba(255,255,255,.018) 80px,
+      rgba(255,255,255,.018) 81px
+    ),
+    /* Grille micro-texture verre dépoli -->*/
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255,255,255,.018) 2px,
+      rgba(255,255,255,.018) 3px
+    ),
+    /* Fond -->*/
+    linear-gradient(160deg, #0d1422 0%, #162038 40%, #111c30 70%, #0d1422 100%);
+  background-attachment: fixed;
   min-height: 100vh;
 }
 body[data-theme="glassmorphism"] nav {
