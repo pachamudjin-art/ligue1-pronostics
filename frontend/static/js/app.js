@@ -301,6 +301,20 @@ function startChatPolling() {
 }
 
 // ── Rendre un message ────────────────────────────────────────
+const REACTION_EMOJIS = ["👍","❤️","😂","😮","😢","😡","🖕"];
+
+function renderReactionsHtml(msg) {
+  const reactions = msg.reactions || [];
+  const chips = reactions.map(r =>
+    `<button class="react-chip${r.mine ? ' mine' : ''}" onclick="sendReaction(${msg.id},'${r.emoji}')">${r.emoji} <span>${r.count}</span></button>`
+  ).join("");
+  const addBtn = `<button class="react-add-btn" onclick="toggleReactPicker(${msg.id})">＋</button>`;
+  return `<div class="reactions-row" id="reactions-${msg.id}">${chips}${addBtn}</div>
+    <div class="react-picker" id="react-picker-${msg.id}" style="display:none">${
+      REACTION_EMOJIS.map(e => `<button onclick="sendReaction(${msg.id},'${e}')">${e}</button>`).join("")
+    }</div>`;
+}
+
 function renderChatMsg(msg) {
   const isMine = msg.username === window.CHAT_USER;
   const canDel = isMine || window.CHAT_IS_ADMIN;
@@ -308,7 +322,6 @@ function renderChatMsg(msg) {
   const d = new Date(msg.created_at.replace(" ", "T") + "Z");
   const timeStr = d.toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"});
 
-  // Détecter si c'est un GIF (message spécial [GIF:url])
   const gifMatch = msg.message.match(/^\[GIF:(https?:\/\/[^\]]+)\]$/);
 
   const div = document.createElement("div");
@@ -327,9 +340,46 @@ function renderChatMsg(msg) {
         ${canDel ? `<button class="chat-del-btn" onclick="deleteChatMsg(${msg.id},this)">✕</button>` : ""}
       </div>
       <div class="chat-text">${contentHtml}</div>
-    </div>`;
+    </div>
+    ${renderReactionsHtml(msg)}`;
   return div;
 }
+
+function toggleReactPicker(msgId) {
+  document.querySelectorAll(".react-picker").forEach(p => {
+    if (p.id !== `react-picker-${msgId}`) p.style.display = "none";
+  });
+  const picker = document.getElementById(`react-picker-${msgId}`);
+  if (picker) picker.style.display = picker.style.display === "none" ? "flex" : "none";
+}
+
+async function sendReaction(msgId, emoji) {
+  const picker = document.getElementById(`react-picker-${msgId}`);
+  if (picker) picker.style.display = "none";
+  const fd = new FormData();
+  fd.append("message_id", msgId);
+  fd.append("emoji", emoji);
+  try {
+    const res = await fetch("/chat/react", {method:"POST", body:fd});
+    const data = await res.json();
+    if (data.ok) {
+      const row = document.getElementById(`reactions-${msgId}`);
+      if (row) {
+        const chips = data.reactions.map(r =>
+          `<button class="react-chip${r.mine ? ' mine' : ''}" onclick="sendReaction(${msgId},'${r.emoji}')">${r.emoji} <span>${r.count}</span></button>`
+        ).join("");
+        const addBtn = `<button class="react-add-btn" onclick="toggleReactPicker(${msgId})">＋</button>`;
+        row.innerHTML = chips + addBtn;
+      }
+    }
+  } catch(e) { console.error(e); }
+}
+
+document.addEventListener("click", e => {
+  if (!e.target.closest(".react-add-btn") && !e.target.closest(".react-picker")) {
+    document.querySelectorAll(".react-picker").forEach(p => p.style.display = "none");
+  }
+});
 
 function escHtml(s) {
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
