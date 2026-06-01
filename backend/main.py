@@ -1067,33 +1067,62 @@ async def stats_page(request: Request, season_id: int):
             nemesis_data[u["username"]] = {"team": "—", "count": 0}
 
     # ── Stats insolites ──────────────────────────────────────────
-    # 1. Dernière victoire de journée (classé 1er)
-    last_win = {}
-    for u in users_list:
-        last_win[u["username"]] = None
-        for md in reversed(matchdays):
-            rows = qall(conn, """
-                SELECT p.home_score as pred_home, p.away_score as pred_away,
-                       m.home_score as real_home, m.away_score as real_away
-                FROM pronostics p JOIN matches m ON m.id=p.match_id
-                WHERE p.user_id=%s AND m.matchday_id=%s AND m.home_score IS NOT NULL
-            """, (u["id"], md["id"]))
-            if not rows: continue
-            stats = compute_matchday_stats([dict(r) for r in rows])
-            # Comparer avec les autres
-            all_pts = []
-            for u2 in users_list:
-                r2 = qall(conn, """
+    # 1. Dernière victoire de journée (classé 1er seul)
+    # Récupérer toutes les saisons L1 pour chercher en arrière si besoin
+    all_league_seasons = qall(conn, """
+        SELECT id, year_start FROM seasons
+        WHERE competition_type='league' ORDER BY year_start DESC
+    """)
+
+    def find_last_win(user_id, seasons_to_check):
+        """Retourne (saison_name, journee_num, nb_journees_depuis) ou None"""
+        journees_since = 0
+        for s in seasons_to_check:
+            mds = qall(conn, "SELECT id, number FROM matchdays WHERE season_id=%s ORDER BY number DESC", (s["id"],))
+            for md in mds:
+                # Vérifier si journée terminée
+                fin = qone(conn, "SELECT COUNT(*) as cnt FROM matches WHERE matchday_id=%s AND home_score IS NOT NULL", (md["id"],))
+                total = qone(conn, "SELECT COUNT(*) as cnt FROM matches WHERE matchday_id=%s", (md["id"],))
+                if not fin or not total or fin["cnt"] == 0 or fin["cnt"] < total["cnt"]:
+                    continue
+                journees_since += 1
+                rows = qall(conn, """
                     SELECT p.home_score as pred_home, p.away_score as pred_away,
                            m.home_score as real_home, m.away_score as real_away
                     FROM pronostics p JOIN matches m ON m.id=p.match_id
                     WHERE p.user_id=%s AND m.matchday_id=%s AND m.home_score IS NOT NULL
-                """, (u2["id"], md["id"]))
-                s2 = compute_matchday_stats([dict(r) for r in r2])
-                all_pts.append(s2["points"])
-            if stats["points"] == max(all_pts) and all_pts.count(max(all_pts)) == 1:
-                last_win[u["username"]] = md["number"]
-                break
+                """, (user_id, md["id"]))
+                if not rows: continue
+                stats = compute_matchday_stats([dict(r) for r in rows])
+                all_pts = []
+                for u2 in users_list:
+                    r2 = qall(conn, """
+                        SELECT p.home_score as pred_home, p.away_score as pred_away,
+                               m.home_score as real_home, m.away_score as real_away
+                        FROM pronostics p JOIN matches m ON m.id=p.match_id
+                        WHERE p.user_id=%s AND m.matchday_id=%s AND m.home_score IS NOT NULL
+                    """, (u2["id"], md["id"]))
+                    s2 = compute_matchday_stats([dict(r) for r in r2])
+                    all_pts.append(s2["points"])
+                if stats["points"] > 0 and stats["points"] == max(all_pts) and all_pts.count(max(all_pts)) == 1:
+                    return {"journee": md["number"], "since": journees_since - 1, "season_year": s["year_start"]}
+        return None
+
+    last_win = {}
+    for u in users_list:
+        result = find_last_win(u["id"], all_league_seasons)
+        last_win[u["username"]] = result
+
+    # Calculer nb journées terminées dans saison actuelle
+    finished_mds_count = 0
+    for md in matchdays:
+        r = qone(conn, """
+            SELECT COUNT(*) FILTER (WHERE home_score IS NOT NULL) as fin,
+                   COUNT(*) as tot
+            FROM matches WHERE matchday_id=%s
+        """, (md["id"],))
+        if r and r["tot"] > 0 and r["fin"] == r["tot"]:
+            finished_mds_count += 1
 
     # 2. La flipette : plus de pronostics identiques à la majorité
     # 3. Tout au pif : moins de pronostics identiques à la majorité
@@ -1165,14 +1194,25 @@ async def stats_page(request: Request, season_id: int):
     all_seasons = get_all_seasons()
     release_db(conn)
 
+    # Calcul écart au leader
+    ecart_data = {}
+    for uname in cumul_data:
+        ecart_data[uname] = []
+    for i in range(len(journee_labels)):
+        leader_pts = max(cumul_data[uname][i] for uname in cumul_data) if cumul_data else 0
+        for uname in cumul_data:
+            ecart_data[uname].append(cumul_data[uname][i] - leader_pts)
+
     return templates.TemplateResponse("stats.html", {
         "request": request, "user": user,
         "season": season, "all_seasons": all_seasons,
         "active_season_id": active_season["id"] if active_season else None,
         "journee_labels": journee_labels,
         "cumul_data": cumul_data,
+        "ecart_data": ecart_data,
         "nemesis_data": nemesis_data,
         "last_win": last_win,
+        "finished_mds_count": finished_mds_count,
         "conformity": conformity,
         "flipette": flipette, "pif": pif,
         "est_avgs": est_avgs,
