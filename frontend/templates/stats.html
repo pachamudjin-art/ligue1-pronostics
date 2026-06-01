@@ -10,8 +10,10 @@
   <!-- ── Graphique évolution points cumulés ──────────────────── -->
   <div class="card" style="margin-bottom:1.2rem;">
     <h2 style="margin-bottom:1rem;">📈 Évolution des points cumulés</h2>
-    <div style="position:relative; width:100%; overflow-x:auto;">
-      <canvas id="cumulChart" style="min-width:500px; max-height:380px;"></canvas>
+    <div style="position:relative; width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+      <div style="min-width:500px;">
+        <canvas id="cumulChart" style="width:100% !important; height:320px !important;"></canvas>
+      </div>
     </div>
   </div>
 
@@ -46,8 +48,10 @@
   <!-- ── Graphique écart au leader ─────────────────────────── -->
   <div class="card" style="margin-bottom:1.2rem;">
     <h2 style="margin-bottom:1rem;">📉 Écart au leader</h2>
-    <div style="position:relative; width:100%; overflow-x:auto;">
-      <canvas id="ecartChart" style="min-width:500px; max-height:320px;"></canvas>
+    <div style="position:relative; width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+      <div style="min-width:500px;">
+        <canvas id="ecartChart" style="width:100% !important; height:260px !important;"></canvas>
+      </div>
     </div>
   </div>
 
@@ -187,7 +191,7 @@ new Chart(ctx2, {
   data: { labels, datasets: ecartDatasets },
   options: {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
     plugins: {
       legend: {
@@ -229,7 +233,7 @@ new Chart(ctx, {
   data: { labels, datasets },
   options: {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
     plugins: {
       legend: {
