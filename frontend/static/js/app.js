@@ -303,6 +303,22 @@ function startChatPolling() {
 // ── Rendre un message ────────────────────────────────────────
 const REACTION_EMOJIS = ["👍","❤️","😂","😮","😢","😡","🖕"];
 
+// Couleurs fixes par username
+const USERNAME_COLORS = [
+  '#e8c45a','#60a5fa','#f87171','#a78bfa',
+  '#34d399','#fb923c','#f472b6','#38bdf8',
+  '#86efac','#fbbf24','#c084fc','#4ade80'
+];
+const _colorCache = {};
+function getUserColor(username) {
+  if (_colorCache[username]) return _colorCache[username];
+  let hash = 0;
+  for (let i = 0; i < username.length; i++) hash = username.charCodeAt(i) + ((hash << 5) - hash);
+  const color = USERNAME_COLORS[Math.abs(hash) % USERNAME_COLORS.length];
+  _colorCache[username] = color;
+  return color;
+}
+
 function renderReactionsHtml(msg) {
   const reactions = msg.reactions || [];
   const hasMyReaction = reactions.some(r => r.mine);
@@ -340,7 +356,7 @@ function renderChatMsg(msg) {
   div.innerHTML = `
     <div class="chat-bubble">
       <div class="chat-meta">
-        <span class="chat-author">${escHtml(msg.username)}</span>
+        <span class="chat-author" style="color:${getUserColor(msg.username)}">${escHtml(msg.username)}</span>
         <span class="chat-time">${timeStr}</span>
         ${canDel ? `<button class="chat-del-btn" onclick="deleteChatMsg(${msg.id},this)">✕</button>` : ""}
       </div>
