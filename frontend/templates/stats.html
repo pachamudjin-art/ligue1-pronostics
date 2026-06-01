@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Stats — {{ season.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <h1>📊 Statistiques</h1>
+  <p style="color:var(--muted); font-size:.88rem; margin-bottom:1.5rem;">{{ season.name }}</p>
+
+  <!-- ── Graphique évolution points cumulés ──────────────────── -->
+  <div class="card" style="margin-bottom:1.2rem;">
+    <h2 style="margin-bottom:1rem;">📈 Évolution des points cumulés</h2>
+    <div style="position:relative; width:100%; overflow-x:auto;">
+      <canvas id="cumulChart" style="min-width:500px; max-height:380px;"></canvas>
+    </div>
+  </div>
+
+  <!-- ── Némésis ─────────────────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.2rem; padding:0; overflow:hidden;">
+    <div style="padding:.75rem 1rem; background:var(--surface2); border-bottom:1px solid var(--border);">
+      <span style="font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:.05em;">
+        👹 Tableau des Némésis
+      </span>
+      <span style="font-size:.75rem; color:var(--muted); margin-left:.5rem;">Équipe qui rapporte le plus souvent 0 pts</span>
+    </div>
+    <table class="ranking-table">
+      <thead>
+        <tr>
+          <th>Joueur</th>
+          <th>Équipe Némésis</th>
+          <th style="text-align:center;">Fois à 0 pts</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for username, data in nemesis_data.items() | sort(attribute='1.count', reverse=True) %}
+        <tr {% if username == user.username %}style="background:rgba(232,196,90,.06);"{% endif %}>
+          <td style="font-weight:{% if username == user.username %}600{% else %}400{% endif %};">{{ username }}</td>
+          <td style="color:var(--accent);">{{ data.team }}</td>
+          <td style="text-align:center; color:var(--muted);">{{ data.count }}×</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Stats insolites ─────────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.2rem;">
+    <h2 style="margin-bottom:1rem;">🎭 Stats insolites</h2>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:.75rem;">
+
+      <!-- Dernière victoire de journée -->
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:.9rem 1rem;">
+        <div style="font-size:.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:.5rem;">
+          🏜️ La plus longue disette
+        </div>
+        <div style="font-size:.8rem; color:var(--muted); margin-bottom:.75rem;">Dernière victoire de journée la plus ancienne</div>
+        <table style="width:100%; font-size:.82rem; border-collapse:collapse;">
+          {% for username, jn in last_win.items() | sort(attribute='1') %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:.3rem 0; {% if username == user.username %}font-weight:600;{% endif %}">{{ username }}</td>
+            <td style="padding:.3rem 0; text-align:right; color:{% if jn %}var(--muted){% else %}#e74c3c{% endif %};">
+              {% if jn %}J{{ jn }}{% else %}Jamais cette saison{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+
+      <!-- La flipette + Tout au pif -->
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:.9rem 1rem;">
+        <div style="font-size:.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:.5rem;">
+          🐓 Conformité des pronostics
+        </div>
+        <div style="font-size:.8rem; color:var(--muted); margin-bottom:.75rem;">% de pronostics dans le sens de la majorité</div>
+        <table style="width:100%; font-size:.82rem; border-collapse:collapse;">
+          {% for username, pct in conformity.items() | sort(attribute='1', reverse=True) %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:.3rem 0; {% if username == user.username %}font-weight:600;{% endif %}">
+              {{ username }}
+              {% if username == flipette %}<span style="font-size:.7rem; color:#f39c12; margin-left:.3rem">🐓 La flipette</span>{% endif %}
+              {% if username == pif %}<span style="font-size:.7rem; color:#9b59b6; margin-left:.3rem">🎲 Tout au pif</span>{% endif %}
+            </td>
+            <td style="padding:.3rem 0; text-align:right; color:var(--muted);">{{ pct }}%</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+
+      <!-- Estimations -->
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:.9rem 1rem;">
+        <div style="font-size:.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:.5rem;">
+          🎯 Moyenne des estimations
+        </div>
+        <div style="font-size:.8rem; color:var(--muted); margin-bottom:.75rem;">Points estimés en moyenne par journée</div>
+        <table style="width:100%; font-size:.82rem; border-collapse:collapse;">
+          {% for username, avg in est_avgs.items() | sort(attribute='1', reverse=True) %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:.3rem 0; {% if username == user.username %}font-weight:600;{% endif %}">
+              {{ username }}
+              {% if username == boulard %}<span style="font-size:.7rem; color:var(--accent); margin-left:.3rem">💰 Le boulard</span>{% endif %}
+              {% if username == francais %}<span style="font-size:.7rem; color:#3498db; margin-left:.3rem">🥖 Le Français</span>{% endif %}
+            </td>
+            <td style="padding:.3rem 0; text-align:right; color:var(--muted);">{{ avg }} pts</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const labels = {{ journee_labels | tojson }};
+const cumulData = {{ cumul_data | tojson }};
+
+// Palette de couleurs
+const COLORS = [
+  '#e8c45a', '#60a5fa', '#f87171', '#a78bfa',
+  '#34d399', '#fb923c', '#f472b6', '#38bdf8', '#86efac'
+];
+
+// Trouver le min global (hors 0) pour l'axe Y
+const allVals = Object.values(cumulData).flat().filter(v => v > 0);
+const minVal = allVals.length ? Math.floor(Math.min(...allVals) * 0.95) : 0;
+
+const datasets = Object.entries(cumulData).map(([name, data], i) => ({
+  label: name,
+  data: data,
+  borderColor: COLORS[i % COLORS.length],
+  backgroundColor: COLORS[i % COLORS.length] + '18',
+  borderWidth: 2.5,
+  pointRadius: 3,
+  pointHoverRadius: 6,
+  tension: 0.3,
+  fill: false,
+}));
+
+const isDark = !document.body.dataset.theme?.includes('minimaliste')
+               && !document.body.dataset.theme?.includes('brume')
+               && !document.body.dataset.theme?.includes('l1classic');
+
+const gridColor = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)';
+const textColor = isDark ? '#8b949e' : '#64748b';
+
+const ctx = document.getElementById('cumulChart').getContext('2d');
+new Chart(ctx, {
+  type: 'line',
+  data: { labels, datasets },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          color: textColor,
+          usePointStyle: true,
+          pointStyleWidth: 10,
+          font: { size: 11 },
+          padding: 14,
+        }
+      },
+      tooltip: {
+        backgroundColor: isDark ? 'rgba(22,27,34,.95)' : 'rgba(255,255,255,.95)',
+        borderColor: isDark ? 'rgba(255,255,255,.1)' : 'rgba(0,0,0,.1)',
+        borderWidth: 1,
+        titleColor: isDark ? '#e6edf3' : '#1a202c',
+        bodyColor: isDark ? '#8b949e' : '#64748b',
+        callbacks: {
+          afterBody: (items) => {
+            const sorted = [...items].sort((a,b) => b.parsed.y - a.parsed.y);
+            return sorted.map((it,i) => `  ${i+1}. ${it.dataset.label}: ${it.parsed.y} pts`);
+          },
+          label: () => null,
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: textColor, font: { size: 10 }, maxRotation: 45 },
+        grid: { color: gridColor },
+      },
+      y: {
+        min: minVal,
+        ticks: { color: textColor, font: { size: 11 } },
+        grid: { color: gridColor },
+      }
+    }
+  }
+});
+</script>
+{% endblock %}

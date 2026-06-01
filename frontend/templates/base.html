@@ -20,6 +20,9 @@
     <a href="/">Journées</a>
     <a href="/classement">Classement</a>
     {% endif %}
+    {% if season and season.competition_type == 'league' %}
+    <a href="/saison/{{ season.id }}/stats" {% if '/stats' in request.url.path %}class="active"{% endif %}>📊 Stats</a>
+    {% endif %}
     <a href="/hall-of-fame" {% if request.url.path == '/hall-of-fame' %}class="active"{% endif %}>🏆 Hall of Fame</a>
     {% if user.is_admin %}
     <a href="/admin" {% if request.url.path.startswith('/admin') %}class="active"{% endif %}>⚙ Admin</a>
