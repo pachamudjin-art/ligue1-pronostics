@@ -988,6 +988,199 @@ async def giphy_search(request: Request, q_param: str = ""):
         return JSONResponse({"data": [], "error": str(e)})
 
 
+# ─── Stats ───────────────────────────────────────────────────────────────────
+
+@app.get("/saison/{season_id}/stats", response_class=HTMLResponse)
+async def stats_page(request: Request, season_id: int):
+    user = get_current_user(request)
+    if not user: return RedirectResponse("/login", status_code=303)
+
+    season = get_season_by_id(season_id)
+    if not season or season.get("competition_type") != "league":
+        return RedirectResponse("/", status_code=303)
+
+    conn = get_db()
+    users_list = qall(conn, "SELECT id, username FROM users WHERE is_admin=0 ORDER BY username")
+    matchdays = qall(conn, "SELECT id, number, label FROM matchdays WHERE season_id=%s ORDER BY number", (season_id,))
+
+    # ── Graphique : points cumulés par journée ──────────────────
+    cumul_data = {}  # {username: [pts_j1, pts_j2, ...]}
+    for u in users_list:
+        cumul = []
+        total = 0
+        for md in matchdays:
+            rows = qall(conn, """
+                SELECT p.home_score as pred_home, p.away_score as pred_away,
+                       m.home_score as real_home, m.away_score as real_away
+                FROM pronostics p JOIN matches m ON m.id=p.match_id
+                WHERE p.user_id=%s AND m.matchday_id=%s
+                  AND m.home_score IS NOT NULL
+            """, (u["id"], md["id"]))
+            stats = compute_matchday_stats([dict(r) for r in rows])
+            # Estimation
+            est = qone(conn, "SELECT estimated_score FROM score_estimates WHERE user_id=%s AND matchday_id=%s",
+                      (u["id"], md["id"]))
+            est_pts = 0
+            if est and rows:
+                # Vérifier si journée complète
+                total_m = qone(conn, "SELECT COUNT(*) as cnt FROM matches WHERE matchday_id=%s", (md["id"],))
+                fin_m = qone(conn, "SELECT COUNT(*) as cnt FROM matches WHERE matchday_id=%s AND home_score IS NOT NULL", (md["id"],))
+                if total_m and fin_m and total_m["cnt"] == fin_m["cnt"] > 0:
+                    est_pts = compute_estimate_points(stats["points"], est["estimated_score"])
+            total += stats["points"] + est_pts
+            cumul.append(total)
+        cumul_data[u["username"]] = cumul
+
+    journee_labels = [md["label"] or f"J{md['number']}" for md in matchdays]
+    # Filtrer journées sans données (tous à 0)
+    last_active = 0
+    for i in range(len(matchdays) - 1, -1, -1):
+        if any(cumul_data[u["username"]][i] > 0 for u in users_list):
+            last_active = i + 1
+            break
+
+    journee_labels = journee_labels[:last_active]
+    for uname in cumul_data:
+        cumul_data[uname] = cumul_data[uname][:last_active]
+
+    # ── Némésis : équipe avec le plus de 0 pts ──────────────────
+    nemesis_data = {}
+    for u in users_list:
+        team_zeros = {}
+        rows = qall(conn, """
+            SELECT m.home_team, m.away_team,
+                   p.home_score as pred_home, p.away_score as pred_away,
+                   m.home_score as real_home, m.away_score as real_away
+            FROM pronostics p JOIN matches m ON m.id=p.match_id
+            JOIN matchdays md ON md.id=m.matchday_id
+            WHERE p.user_id=%s AND md.season_id=%s AND m.home_score IS NOT NULL
+        """, (u["id"], season_id))
+        for r in rows:
+            pts = compute_points(r["real_home"], r["real_away"], r["pred_home"], r["pred_away"])
+            if pts["points"] == 0:
+                for team in [r["home_team"], r["away_team"]]:
+                    team_zeros[team] = team_zeros.get(team, 0) + 1
+        if team_zeros:
+            worst = max(team_zeros, key=lambda t: team_zeros[t])
+            nemesis_data[u["username"]] = {"team": worst, "count": team_zeros[worst]}
+        else:
+            nemesis_data[u["username"]] = {"team": "—", "count": 0}
+
+    # ── Stats insolites ──────────────────────────────────────────
+    # 1. Dernière victoire de journée (classé 1er)
+    last_win = {}
+    for u in users_list:
+        last_win[u["username"]] = None
+        for md in reversed(matchdays):
+            rows = qall(conn, """
+                SELECT p.home_score as pred_home, p.away_score as pred_away,
+                       m.home_score as real_home, m.away_score as real_away
+                FROM pronostics p JOIN matches m ON m.id=p.match_id
+                WHERE p.user_id=%s AND m.matchday_id=%s AND m.home_score IS NOT NULL
+            """, (u["id"], md["id"]))
+            if not rows: continue
+            stats = compute_matchday_stats([dict(r) for r in rows])
+            # Comparer avec les autres
+            all_pts = []
+            for u2 in users_list:
+                r2 = qall(conn, """
+                    SELECT p.home_score as pred_home, p.away_score as pred_away,
+                           m.home_score as real_home, m.away_score as real_away
+                    FROM pronostics p JOIN matches m ON m.id=p.match_id
+                    WHERE p.user_id=%s AND m.matchday_id=%s AND m.home_score IS NOT NULL
+                """, (u2["id"], md["id"]))
+                s2 = compute_matchday_stats([dict(r) for r in r2])
+                all_pts.append(s2["points"])
+            if stats["points"] == max(all_pts) and all_pts.count(max(all_pts)) == 1:
+                last_win[u["username"]] = md["number"]
+                break
+
+    # 2. La flipette : plus de pronostics identiques à la majorité
+    # 3. Tout au pif : moins de pronostics identiques à la majorité
+    flipette_scores = {u["username"]: 0 for u in users_list}
+    pif_scores = {u["username"]: 0 for u in users_list}
+    total_pronos = {u["username"]: 0 for u in users_list}
+
+    all_matches = qall(conn, """
+        SELECT m.id FROM matches m
+        JOIN matchdays md ON md.id=m.matchday_id
+        WHERE md.season_id=%s AND m.home_score IS NOT NULL
+    """, (season_id,))
+
+    for match in all_matches:
+        mid = match["id"]
+        match_pronos = qall(conn, """
+            SELECT p.user_id, p.home_score, p.away_score, u.username
+            FROM pronostics p JOIN users u ON u.id=p.user_id
+            WHERE p.match_id=%s
+        """, (mid,))
+        if len(match_pronos) < 2: continue
+
+        # Outcome majority
+        from collections import Counter
+        outcomes = []
+        for mp in match_pronos:
+            if mp["home_score"] > mp["away_score"]: o = "H"
+            elif mp["home_score"] < mp["away_score"]: o = "A"
+            else: o = "D"
+            outcomes.append((mp["username"], o))
+
+        outcome_counts = Counter(o for _, o in outcomes)
+        majority_outcome = outcome_counts.most_common(1)[0][0]
+
+        for uname, o in outcomes:
+            total_pronos[uname] = total_pronos.get(uname, 0) + 1
+            if o == majority_outcome:
+                flipette_scores[uname] = flipette_scores.get(uname, 0) + 1
+
+    # Calculer le % de conformité
+    conformity = {}
+    for uname in flipette_scores:
+        if total_pronos.get(uname, 0) > 0:
+            conformity[uname] = round(100 * flipette_scores[uname] / total_pronos[uname], 1)
+        else:
+            conformity[uname] = 0
+
+    flipette = max(conformity, key=lambda u: conformity[u]) if conformity else "—"
+    pif = min(conformity, key=lambda u: conformity[u]) if conformity else "—"
+
+    # 4. Le boulard : moyenne d'estimation la plus haute
+    # 5. Le Français : moyenne la plus basse
+    est_avgs = {}
+    for u in users_list:
+        ests = qall(conn, """
+            SELECT se.estimated_score FROM score_estimates se
+            JOIN matchdays md ON md.id=se.matchday_id
+            WHERE se.user_id=%s AND md.season_id=%s
+        """, (u["id"], season_id))
+        if ests:
+            est_avgs[u["username"]] = round(sum(e["estimated_score"] for e in ests) / len(ests), 1)
+        else:
+            est_avgs[u["username"]] = 0
+
+    boulard = max(est_avgs, key=lambda u: est_avgs[u]) if est_avgs else "—"
+    francais = min((u for u in est_avgs if est_avgs[u] > 0), key=lambda u: est_avgs[u]) if est_avgs else "—"
+
+    active_season = get_active_season()
+    all_seasons = get_all_seasons()
+    release_db(conn)
+
+    return templates.TemplateResponse("stats.html", {
+        "request": request, "user": user,
+        "season": season, "all_seasons": all_seasons,
+        "active_season_id": active_season["id"] if active_season else None,
+        "journee_labels": journee_labels,
+        "cumul_data": cumul_data,
+        "nemesis_data": nemesis_data,
+        "last_win": last_win,
+        "conformity": conformity,
+        "flipette": flipette, "pif": pif,
+        "est_avgs": est_avgs,
+        "boulard": boulard, "francais": francais,
+        "last_active": last_active,
+    })
+
+
 # ─── Hall of Fame ────────────────────────────────────────────────────────────
 
 HOF_SEED = [
