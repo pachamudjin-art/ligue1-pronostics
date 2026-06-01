@@ -903,10 +903,12 @@ async def chat_poll(request: Request, after_id: int = 0):
         msg_ids = [m["id"] for m in msg_list]
         ph = ",".join(["%s"] * len(msg_ids))
         reactions = qall(conn, f"""
-            SELECT message_id, emoji, COUNT(*) as count,
-                   bool_or(user_id=%s) as mine
-            FROM chat_reactions WHERE message_id IN ({ph})
-            GROUP BY message_id, emoji ORDER BY count DESC
+            SELECT cr.message_id, cr.emoji, COUNT(*) as count,
+                   bool_or(cr.user_id=%s) as mine,
+                   string_agg(u.username, ', ' ORDER BY u.username) as users
+            FROM chat_reactions cr JOIN users u ON u.id=cr.user_id
+            WHERE cr.message_id IN ({ph})
+            GROUP BY cr.message_id, cr.emoji ORDER BY count DESC
         """, [user["id"]] + msg_ids)
         react_map = {}
         for r in reactions:
@@ -1241,20 +1243,37 @@ async def chat_react(request: Request, message_id: int = Form(...), emoji: str =
     # Toggle : si la réaction existe déjà, la supprimer ; sinon l'ajouter
     existing = qone(conn, "SELECT id FROM chat_reactions WHERE message_id=%s AND user_id=%s AND emoji=%s",
                     (message_id, user["id"], emoji))
-    if existing:
-        q(conn, "DELETE FROM chat_reactions WHERE id=%s", (existing["id"],))
-        action = "removed"
-    else:
-        q(conn, "INSERT INTO chat_reactions (message_id, user_id, emoji) VALUES (%s,%s,%s)",
-          (message_id, user["id"], emoji))
-        action = "added"
+    # Supprimer toute réaction existante de cet user sur ce message
+    existing_any = qone(conn, "SELECT id, emoji FROM chat_reactions WHERE message_id=%s AND user_id=%s",
+                        (message_id, user["id"]))
+    if existing_any:
+        q(conn, "DELETE FROM chat_reactions WHERE message_id=%s AND user_id=%s",
+          (message_id, user["id"]))
+        # Si même emoji → toggle off, sinon → remplace
+        if existing_any["emoji"] == emoji:
+            action = "removed"
+            conn.commit()
+            reactions = qall(conn, """
+                SELECT cr.emoji, COUNT(*) as count,
+                       bool_or(cr.user_id=%s) as mine,
+                       string_agg(u.username, ', ' ORDER BY u.username) as users
+                FROM chat_reactions cr JOIN users u ON u.id=cr.user_id
+                WHERE cr.message_id=%s GROUP BY cr.emoji ORDER BY count DESC
+            """, (user["id"], message_id))
+            release_db(conn)
+            return JSONResponse({"ok": True, "action": action,
+                                 "reactions": [dict(r) for r in reactions]})
+    # Ajouter la nouvelle réaction
+    q(conn, "INSERT INTO chat_reactions (message_id, user_id, emoji) VALUES (%s,%s,%s)",
+      (message_id, user["id"], emoji))
+    action = "added"
     conn.commit()
-    # Retourner les réactions à jour pour ce message
     reactions = qall(conn, """
-        SELECT emoji, COUNT(*) as count,
-               bool_or(user_id=%s) as mine
-        FROM chat_reactions WHERE message_id=%s
-        GROUP BY emoji ORDER BY count DESC
+        SELECT cr.emoji, COUNT(*) as count,
+               bool_or(cr.user_id=%s) as mine,
+               string_agg(u.username, ', ' ORDER BY u.username) as users
+        FROM chat_reactions cr JOIN users u ON u.id=cr.user_id
+        WHERE cr.message_id=%s GROUP BY cr.emoji ORDER BY count DESC
     """, (user["id"], message_id))
     release_db(conn)
     return JSONResponse({"ok": True, "action": action,
