@@ -897,8 +897,27 @@ async def chat_poll(request: Request, after_id: int = 0):
         FROM chat_messages cm JOIN users u ON u.id=cm.user_id
         WHERE cm.id > %s ORDER BY cm.created_at ASC LIMIT 50
     """, (after_id,))
+    msg_list = [dict(r) for r in rows]
+    # Charger les réactions
+    if msg_list:
+        msg_ids = [m["id"] for m in msg_list]
+        ph = ",".join(["%s"] * len(msg_ids))
+        reactions = qall(conn, f"""
+            SELECT message_id, emoji, COUNT(*) as count,
+                   bool_or(user_id=%s) as mine
+            FROM chat_reactions WHERE message_id IN ({ph})
+            GROUP BY message_id, emoji ORDER BY count DESC
+        """, [user["id"]] + msg_ids)
+        react_map = {}
+        for r in reactions:
+            mid = r["message_id"]
+            if mid not in react_map:
+                react_map[mid] = []
+            react_map[mid].append({"emoji": r["emoji"], "count": int(r["count"]), "mine": bool(r["mine"])})
+        for m in msg_list:
+            m["reactions"] = react_map.get(m["id"], [])
     release_db(conn)
-    return JSONResponse({"ok": True, "messages": [dict(r) for r in rows]})
+    return JSONResponse({"ok": True, "messages": msg_list})
 
 @app.post("/chat/send")
 async def chat_send(request: Request, message: str = Form(...)):
@@ -1206,6 +1225,41 @@ async def admin_debug(request: Request):
     <p style="color:#8b949e;font-size:.8rem">UTC : {utcnow_str()}</p>
     </body></html>"""
     return HTMLResponse(html)
+
+# ─── Réactions chat ──────────────────────────────────────────────────────────
+
+VALID_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "😡", "🖕"]
+
+@app.post("/chat/react")
+async def chat_react(request: Request, message_id: int = Form(...), emoji: str = Form(...)):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"ok": False}, status_code=401)
+    if emoji not in VALID_REACTIONS:
+        return JSONResponse({"ok": False, "error": "Emoji invalide"}, status_code=400)
+    conn = get_db()
+    # Toggle : si la réaction existe déjà, la supprimer ; sinon l'ajouter
+    existing = qone(conn, "SELECT id FROM chat_reactions WHERE message_id=%s AND user_id=%s AND emoji=%s",
+                    (message_id, user["id"], emoji))
+    if existing:
+        q(conn, "DELETE FROM chat_reactions WHERE id=%s", (existing["id"],))
+        action = "removed"
+    else:
+        q(conn, "INSERT INTO chat_reactions (message_id, user_id, emoji) VALUES (%s,%s,%s)",
+          (message_id, user["id"], emoji))
+        action = "added"
+    conn.commit()
+    # Retourner les réactions à jour pour ce message
+    reactions = qall(conn, """
+        SELECT emoji, COUNT(*) as count,
+               bool_or(user_id=%s) as mine
+        FROM chat_reactions WHERE message_id=%s
+        GROUP BY emoji ORDER BY count DESC
+    """, (user["id"], message_id))
+    release_db(conn)
+    return JSONResponse({"ok": True, "action": action,
+                         "reactions": [dict(r) for r in reactions]})
+
 
 @app.get("/admin/fix-team-names")
 async def admin_fix_team_names(request: Request):

@@ -110,6 +110,13 @@ def init_db():
             joueur TEXT NOT NULL,
             points INTEGER,
             created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
+        """CREATE TABLE IF NOT EXISTS chat_reactions (
+            id SERIAL PRIMARY KEY,
+            message_id INTEGER NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            emoji TEXT NOT NULL,
+            created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'),
+            UNIQUE(message_id, user_id, emoji))""",
         # Table résultat podium réel
         """CREATE TABLE IF NOT EXISTS podium_results (
             id SERIAL PRIMARY KEY,
@@ -130,6 +137,13 @@ def init_db():
             id SERIAL PRIMARY KEY, type TEXT NOT NULL, num INTEGER NOT NULL,
             saison TEXT NOT NULL, joueur TEXT NOT NULL, points INTEGER,
             created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
+        """CREATE TABLE IF NOT EXISTS chat_reactions (
+            id SERIAL PRIMARY KEY,
+            message_id INTEGER NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            emoji TEXT NOT NULL,
+            created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'),
+            UNIQUE(message_id, user_id, emoji))""",
     ]
     for m in migrations:
         try: c.execute(m)
