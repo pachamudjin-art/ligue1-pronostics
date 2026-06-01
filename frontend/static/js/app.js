@@ -390,6 +390,40 @@ document.addEventListener("click", e => {
   }
 });
 
+// ── Appui long mobile pour ouvrir le sélecteur de réaction ───
+(function() {
+  let pressTimer = null;
+  let pressTarget = null;
+
+  function startPress(e) {
+    const bubble = e.target.closest(".chat-bubble");
+    if (!bubble) return;
+    const msgDiv = bubble.closest(".chat-msg");
+    if (!msgDiv) return;
+    const msgId = msgDiv.dataset.id;
+    pressTarget = msgId;
+    pressTimer = setTimeout(() => {
+      if (pressTarget === msgId) {
+        // Vibration tactile si disponible
+        if (navigator.vibrate) navigator.vibrate(40);
+        toggleReactPicker(msgId);
+        // Scroller pour que le picker soit visible
+        const picker = document.getElementById(`react-picker-${msgId}`);
+        if (picker) picker.scrollIntoView({block: "nearest", behavior: "smooth"});
+      }
+    }, 500);
+  }
+
+  function cancelPress() {
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    pressTarget = null;
+  }
+
+  document.addEventListener("touchstart", startPress, {passive: true});
+  document.addEventListener("touchend", cancelPress, {passive: true});
+  document.addEventListener("touchmove", cancelPress, {passive: true});
+})();
+
 function escHtml(s) {
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
     .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
