@@ -43,6 +43,14 @@
     </table>
   </div>
 
+  <!-- ── Graphique écart au leader ─────────────────────────── -->
+  <div class="card" style="margin-bottom:1.2rem;">
+    <h2 style="margin-bottom:1rem;">📉 Écart au leader</h2>
+    <div style="position:relative; width:100%; overflow-x:auto;">
+      <canvas id="ecartChart" style="min-width:500px; max-height:320px;"></canvas>
+    </div>
+  </div>
+
   <!-- ── Stats insolites ─────────────────────────────────────── -->
   <div class="card" style="margin-bottom:1.2rem;">
     <h2 style="margin-bottom:1rem;">🎭 Stats insolites</h2>
@@ -54,13 +62,21 @@
         <div style="font-size:.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:.5rem;">
           🏜️ La plus longue disette
         </div>
-        <div style="font-size:.8rem; color:var(--muted); margin-bottom:.75rem;">Dernière victoire de journée la plus ancienne</div>
+        <div style="font-size:.8rem; color:var(--muted); margin-bottom:.75rem;">Dernière victoire de journée solo</div>
         <table style="width:100%; font-size:.82rem; border-collapse:collapse;">
-          {% for username, jn in last_win.items() | sort(attribute='1') %}
+          {% set sorted_wins = last_win.items() | list | sort(attribute='1.since', reverse=True) %}
+          {% for username, data in sorted_wins %}
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:.3rem 0; {% if username == user.username %}font-weight:600;{% endif %}">{{ username }}</td>
-            <td style="padding:.3rem 0; text-align:right; color:{% if jn %}var(--muted){% else %}#e74c3c{% endif %};">
-              {% if jn %}J{{ jn }}{% else %}Jamais cette saison{% endif %}
+            <td style="padding:.3rem 0; text-align:right;">
+              {% if data %}
+                <span style="color:var(--muted);">
+                  J{{ data.journee }}{% if data.season_year != season.year_start %} ({{ data.season_year }}/{{ data.season_year + 1 }}){% endif %}
+                </span>
+                <span style="color:#e74c3c; font-size:.75rem; margin-left:.3rem;">— {{ data.since }} J</span>
+              {% else %}
+                <span style="color:#e74c3c;">Jamais</span>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -147,6 +163,65 @@ const isDark = !document.body.dataset.theme?.includes('minimaliste')
 
 const gridColor = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)';
 const textColor = isDark ? '#8b949e' : '#64748b';
+
+const ecartData = {{ ecart_data | tojson }};
+
+// Graphique écart au leader
+const ecartDatasets = Object.entries(ecartData).map(([name, data], i) => ({
+  label: name,
+  data: data,
+  borderColor: COLORS[i % COLORS.length],
+  backgroundColor: COLORS[i % COLORS.length] + '15',
+  borderWidth: 2,
+  pointRadius: 2.5,
+  pointHoverRadius: 5,
+  tension: 0.3,
+  fill: false,
+}));
+
+const ecartMin = Math.min(...Object.values(ecartData).flat().filter(v => v < 0)) - 5 || -10;
+
+const ctx2 = document.getElementById('ecartChart').getContext('2d');
+new Chart(ctx2, {
+  type: 'line',
+  data: { labels, datasets: ecartDatasets },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { color: textColor, usePointStyle: true, pointStyleWidth: 10, font: { size: 11 }, padding: 14 }
+      },
+      tooltip: {
+        backgroundColor: isDark ? 'rgba(22,27,34,.95)' : 'rgba(255,255,255,.95)',
+        borderColor: isDark ? 'rgba(255,255,255,.1)' : 'rgba(0,0,0,.1)',
+        borderWidth: 1,
+        titleColor: isDark ? '#e6edf3' : '#1a202c',
+        bodyColor: isDark ? '#8b949e' : '#64748b',
+        callbacks: {
+          afterBody: (items) => {
+            const sorted = [...items].sort((a,b) => b.parsed.y - a.parsed.y);
+            return sorted.map((it,i) => `  ${i+1}. ${it.dataset.label}: ${it.parsed.y >= 0 ? '+' : ''}${it.parsed.y} pts`);
+          },
+          label: () => null,
+        }
+      }
+    },
+    scales: {
+      x: { ticks: { color: textColor, font: { size: 10 }, maxRotation: 45 }, grid: { color: gridColor } },
+      y: {
+        min: ecartMin, max: 5,
+        ticks: { color: textColor, font: { size: 11 }, callback: v => v === 0 ? '0 (leader)' : v },
+        grid: {
+          color: (ctx) => ctx.tick.value === 0 ? (isDark ? 'rgba(255,255,255,.2)' : 'rgba(0,0,0,.15)') : gridColor,
+          lineWidth: (ctx) => ctx.tick.value === 0 ? 2 : 1,
+        }
+      }
+    }
+  }
+});
 
 const ctx = document.getElementById('cumulChart').getContext('2d');
 new Chart(ctx, {
