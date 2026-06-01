@@ -21,19 +21,24 @@
        class="btn btn-secondary btn-sm" download>
       📥 Télécharger CSV
     </a>
-    <button class="btn btn-secondary btn-sm" onclick="sendBackup({{ matchday.id }})">
+    <button id="btn-backup" class="btn btn-secondary btn-sm"
+            onclick="sendBackup(this, {{ matchday.id }})">
       📧 Envoyer backup par mail
     </button>
   </div>
   <script>
-  async function sendBackup(mdId) {
-    const btn = event.target;
+  async function sendBackup(btn, mdId) {
     btn.disabled = true; btn.textContent = "⏳ Envoi...";
-    const res = await fetch(`/admin/send-backup/${mdId}`, {method:"POST"});
-    const data = await res.json();
+    try {
+      const res = await fetch("/admin/send-backup/" + mdId, {method:"POST"});
+      const data = await res.json();
+      btn.textContent = data.ok ? "✓ Mail envoyé !" : "✗ Erreur: " + (data.error || "inconnue");
+    } catch(e) {
+      btn.textContent = "✗ Erreur réseau";
+      console.error(e);
+    }
     btn.disabled = false;
-    btn.textContent = data.ok ? "✓ Mail envoyé !" : "✗ Erreur mail";
-    setTimeout(() => btn.textContent = "📧 Envoyer backup par mail", 3000);
+    setTimeout(() => btn.textContent = "📧 Envoyer backup par mail", 4000);
   }
   </script>
 
