@@ -1546,7 +1546,10 @@ def send_csv_backup(season_name: str, matchday_label: str, csv_content: str):
         filename = f"pronos_{season_name.replace(' ','_')}_{matchday_label.replace(' ','_')}.csv"
         part.add_header("Content-Disposition", f"attachment; filename={filename}")
         msg.attach(part)
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
             server.login(SMTP_FROM, SMTP_PASS)
             server.sendmail(SMTP_FROM, SMTP_TO, msg.as_string())
         print(f"Mail backup envoyé : {filename}")
@@ -1602,7 +1605,7 @@ async def admin_export_csv(request: Request, matchday_id: int):
 
 @app.post("/admin/send-backup/{matchday_id}")
 async def admin_send_backup(request: Request, matchday_id: int):
-    """Envoie le backup CSV par mail."""
+    """Envoie le backup CSV par mail dans un thread séparé."""
     require_admin(request)
     conn = get_db()
     md = qone(conn, "SELECT * FROM matchdays WHERE id=%s", (matchday_id,))
@@ -1613,7 +1616,9 @@ async def admin_send_backup(request: Request, matchday_id: int):
     csv_content = generate_pronos_csv(season["id"], matchday_id, conn)
     release_db(conn)
     label = md["label"] or f"J{md['number']}"
-    ok = send_csv_backup(season["name"], label, csv_content)
+    import asyncio
+    loop = asyncio.get_event_loop()
+    ok = await loop.run_in_executor(None, send_csv_backup, season["name"], label, csv_content)
     return JSONResponse({"ok": ok})
 
 
