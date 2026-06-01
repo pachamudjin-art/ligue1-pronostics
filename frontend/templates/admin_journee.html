@@ -15,6 +15,28 @@
 
   <h1>⚙ {{ matchday.label or 'Journée ' ~ matchday.number }}</h1>
 
+  <!-- Export CSV & mail backup -->
+  <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.75rem;">
+    <a href="/admin/export-csv/{{ matchday.id }}"
+       class="btn btn-secondary btn-sm" download>
+      📥 Télécharger CSV
+    </a>
+    <button class="btn btn-secondary btn-sm" onclick="sendBackup({{ matchday.id }})">
+      📧 Envoyer backup par mail
+    </button>
+  </div>
+  <script>
+  async function sendBackup(mdId) {
+    const btn = event.target;
+    btn.disabled = true; btn.textContent = "⏳ Envoi...";
+    const res = await fetch(`/admin/send-backup/${mdId}`, {method:"POST"});
+    const data = await res.json();
+    btn.disabled = false;
+    btn.textContent = data.ok ? "✓ Mail envoyé !" : "✗ Erreur mail";
+    setTimeout(() => btn.textContent = "📧 Envoyer backup par mail", 3000);
+  }
+  </script>
+
   <!-- Renommer la phase -->
   <div class="card" style="margin-bottom:1rem; padding:.75rem 1rem;">
     <form method="post" action="/admin/matchday/rename"
