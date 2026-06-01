@@ -305,10 +305,15 @@ const REACTION_EMOJIS = ["👍","❤️","😂","😮","😢","😡","🖕"];
 
 function renderReactionsHtml(msg) {
   const reactions = msg.reactions || [];
+  const hasMyReaction = reactions.some(r => r.mine);
   const chips = reactions.map(r =>
-    `<button class="react-chip${r.mine ? ' mine' : ''}" onclick="sendReaction(${msg.id},'${r.emoji}')">${r.emoji} <span>${r.count}</span></button>`
+    `<button class="react-chip${r.mine ? ' mine' : ''}"
+      onclick="sendReaction(${msg.id},'${r.emoji}')"
+      title="${r.users || ''}">${r.emoji} <span>${r.count}</span></button>`
   ).join("");
-  const addBtn = `<button class="react-add-btn" onclick="toggleReactPicker(${msg.id})">＋</button>`;
+  // Bouton ＋ seulement si pas encore réagi
+  const addBtn = hasMyReaction ? "" :
+    `<button class="react-add-btn" onclick="toggleReactPicker(${msg.id})">＋</button>`;
   return `<div class="reactions-row" id="reactions-${msg.id}">${chips}${addBtn}</div>
     <div class="react-picker" id="react-picker-${msg.id}" style="display:none">${
       REACTION_EMOJIS.map(e => `<button onclick="sendReaction(${msg.id},'${e}')">${e}</button>`).join("")
@@ -365,10 +370,14 @@ async function sendReaction(msgId, emoji) {
     if (data.ok) {
       const row = document.getElementById(`reactions-${msgId}`);
       if (row) {
+        const hasMyReaction = data.reactions.some(r => r.mine);
         const chips = data.reactions.map(r =>
-          `<button class="react-chip${r.mine ? ' mine' : ''}" onclick="sendReaction(${msgId},'${r.emoji}')">${r.emoji} <span>${r.count}</span></button>`
+          `<button class="react-chip${r.mine ? ' mine' : ''}"
+            onclick="sendReaction(${msgId},'${r.emoji}')"
+            title="${r.users || ''}">${r.emoji} <span>${r.count}</span></button>`
         ).join("");
-        const addBtn = `<button class="react-add-btn" onclick="toggleReactPicker(${msgId})">＋</button>`;
+        const addBtn = hasMyReaction ? "" :
+          `<button class="react-add-btn" onclick="toggleReactPicker(${msgId})">＋</button>`;
         row.innerHTML = chips + addBtn;
       }
     }
