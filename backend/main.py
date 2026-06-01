@@ -97,50 +97,72 @@ def get_all_seasons():
 def compute_ranking_for_season(season_id, conn):
     users = qall(conn, "SELECT * FROM users WHERE is_admin=0")
     matchdays = qall(conn, "SELECT id FROM matchdays WHERE season_id=%s", (season_id,))
-    # Résultat podium réel (si existe)
     podium_result = qone(conn, "SELECT * FROM podium_results WHERE season_id=%s", (season_id,))
+
+    # Une seule requête pour tous les pronostics
+    from collections import defaultdict
+    all_rows = qall(conn, """
+        SELECT p.user_id,
+               p.home_score as pred_home, p.away_score as pred_away,
+               m.home_score as real_home, m.away_score as real_away,
+               m.matchday_id
+        FROM pronostics p
+        JOIN matches m ON m.id=p.match_id
+        JOIN matchdays md ON md.id=m.matchday_id
+        WHERE md.season_id=%s AND m.home_score IS NOT NULL
+    """, (season_id,))
+    rows_by_user = defaultdict(list)
+    for r in all_rows:
+        rows_by_user[r["user_id"]].append(dict(r))
+
+    # Une seule requête pour toutes les estimations
+    all_ests = qall(conn, """
+        SELECT se.user_id, se.matchday_id, se.estimated_score
+        FROM score_estimates se
+        JOIN matchdays md ON md.id=se.matchday_id
+        WHERE md.season_id=%s
+    """, (season_id,))
+    ests_by_user_md = {}
+    for e in all_ests:
+        ests_by_user_md[(e["user_id"], e["matchday_id"])] = e["estimated_score"]
+
+    # Journées complètes
+    md_completion = {}
+    for md in matchdays:
+        r = qone(conn, """
+            SELECT COUNT(*) FILTER (WHERE home_score IS NOT NULL) as fin,
+                   COUNT(*) as tot FROM matches WHERE matchday_id=%s
+        """, (md["id"],))
+        md_completion[md["id"]] = r and r["tot"] > 0 and r["fin"] == r["tot"]
+
+    # Podiums
+    all_podiums = {}
+    if podium_result:
+        pods = qall(conn, "SELECT * FROM podium_pronostics WHERE season_id=%s", (season_id,))
+        for p in pods:
+            all_podiums[p["user_id"]] = p
+
     players_data = []
     for u in users:
-        rows = qall(conn, """
-            SELECT p.home_score as pred_home, p.away_score as pred_away,
-                   m.home_score as real_home, m.away_score as real_away
-            FROM pronostics p
-            JOIN matches m ON m.id=p.match_id
-            JOIN matchdays md ON md.id=m.matchday_id
-            WHERE p.user_id=%s AND md.season_id=%s
-              AND m.home_score IS NOT NULL AND m.away_score IS NOT NULL
-        """, (u["id"], season_id))
-        stats = compute_matchday_stats([dict(r) for r in rows])
+        rows = rows_by_user.get(u["id"], [])
+        stats = compute_matchday_stats(rows)
         # Points podium
         podium_pts = 0
-        if podium_result:
-            my_podium = qone(conn, "SELECT * FROM podium_pronostics WHERE user_id=%s AND season_id=%s",
-                            (u["id"], season_id))
-            if my_podium:
-                pp = compute_podium_points(
-                    podium_result["rank1"], podium_result["rank2"], podium_result["rank3"],
-                    my_podium["rank1"], my_podium["rank2"], my_podium["rank3"]
-                )
-                podium_pts = pp["points"]
+        if podium_result and u["id"] in all_podiums:
+            my_podium = all_podiums[u["id"]]
+            pp = compute_podium_points(
+                podium_result["rank1"], podium_result["rank2"], podium_result["rank3"],
+                my_podium["rank1"], my_podium["rank2"], my_podium["rank3"]
+            )
+            podium_pts = pp["points"]
         estimates_ok = 0
+        # Utiliser les données déjà chargées
         for md in matchdays:
-            est = qone(conn, "SELECT estimated_score FROM score_estimates WHERE user_id=%s AND matchday_id=%s",
-                       (u["id"], md["id"]))
-            if est:
-                # Vérifier que TOUS les matchs de la journée sont terminés
-                total_matches = qone(conn, "SELECT COUNT(*) as cnt FROM matches WHERE matchday_id=%s", (md["id"],))
-                finished_matches = qone(conn, "SELECT COUNT(*) as cnt FROM matches WHERE matchday_id=%s AND home_score IS NOT NULL", (md["id"],))
-                if not total_matches or not finished_matches: continue
-                if total_matches["cnt"] == 0 or finished_matches["cnt"] < total_matches["cnt"]: continue
-                md_rows = qall(conn, """
-                    SELECT p.home_score as pred_home, p.away_score as pred_away,
-                           m.home_score as real_home, m.away_score as real_away
-                    FROM pronostics p JOIN matches m ON m.id=p.match_id
-                    WHERE p.user_id=%s AND m.matchday_id=%s
-                      AND m.home_score IS NOT NULL AND m.away_score IS NOT NULL
-                """, (u["id"], md["id"]))
-                md_stats = compute_matchday_stats([dict(r) for r in md_rows])
-                if compute_estimate_points(md_stats["points"], est["estimated_score"]) == 2:
+            est_val = ests_by_user_md.get((u["id"], md["id"]))
+            if est_val and md_completion.get(md["id"]):
+                md_rows = [r for r in rows if r["matchday_id"] == md["id"]]
+                md_stats = compute_matchday_stats(md_rows)
+                if compute_estimate_points(md_stats["points"], est_val) == 2:
                     estimates_ok += 1
         players_data.append({
             "user_id": u["id"], "username": u["username"],
@@ -1003,30 +1025,56 @@ async def stats_page(request: Request, season_id: int):
     users_list = qall(conn, "SELECT id, username FROM users WHERE is_admin=0 ORDER BY username")
     matchdays = qall(conn, "SELECT id, number, label FROM matchdays WHERE season_id=%s ORDER BY number", (season_id,))
 
-    # ── Graphique : points cumulés par journée ──────────────────
-    cumul_data = {}  # {username: [pts_j1, pts_j2, ...]}
+    # ── Graphique : points cumulés — UNE seule requête massive ──
+    # Récupérer TOUS les pronostics de la saison en une requête
+    all_pronos = qall(conn, """
+        SELECT p.user_id, m.matchday_id,
+               p.home_score as pred_home, p.away_score as pred_away,
+               m.home_score as real_home, m.away_score as real_away
+        FROM pronostics p
+        JOIN matches m ON m.id=p.match_id
+        JOIN matchdays md ON md.id=m.matchday_id
+        WHERE md.season_id=%s AND m.home_score IS NOT NULL
+    """, (season_id,))
+
+    # Récupérer TOUTES les estimations de la saison
+    all_ests = qall(conn, """
+        SELECT se.user_id, se.matchday_id, se.estimated_score
+        FROM score_estimates se
+        JOIN matchdays md ON md.id=se.matchday_id
+        WHERE md.season_id=%s
+    """, (season_id,))
+
+    # Récupérer journées complètes
+    md_completion = {}
+    for md in matchdays:
+        r = qone(conn, """
+            SELECT COUNT(*) FILTER (WHERE home_score IS NOT NULL) as fin,
+                   COUNT(*) as tot FROM matches WHERE matchday_id=%s
+        """, (md["id"],))
+        md_completion[md["id"]] = r and r["tot"] > 0 and r["fin"] == r["tot"]
+
+    # Indexer pronostics par (user_id, matchday_id)
+    from collections import defaultdict
+    pronos_by_user_md = defaultdict(list)
+    for p in all_pronos:
+        pronos_by_user_md[(p["user_id"], p["matchday_id"])].append(dict(p))
+
+    ests_by_user_md = {}
+    for e in all_ests:
+        ests_by_user_md[(e["user_id"], e["matchday_id"])] = e["estimated_score"]
+
+    cumul_data = {}
     for u in users_list:
         cumul = []
         total = 0
         for md in matchdays:
-            rows = qall(conn, """
-                SELECT p.home_score as pred_home, p.away_score as pred_away,
-                       m.home_score as real_home, m.away_score as real_away
-                FROM pronostics p JOIN matches m ON m.id=p.match_id
-                WHERE p.user_id=%s AND m.matchday_id=%s
-                  AND m.home_score IS NOT NULL
-            """, (u["id"], md["id"]))
-            stats = compute_matchday_stats([dict(r) for r in rows])
-            # Estimation
-            est = qone(conn, "SELECT estimated_score FROM score_estimates WHERE user_id=%s AND matchday_id=%s",
-                      (u["id"], md["id"]))
+            rows = pronos_by_user_md.get((u["id"], md["id"]), [])
+            stats = compute_matchday_stats(rows)
+            est_val = ests_by_user_md.get((u["id"], md["id"]))
             est_pts = 0
-            if est and rows:
-                # Vérifier si journée complète
-                total_m = qone(conn, "SELECT COUNT(*) as cnt FROM matches WHERE matchday_id=%s", (md["id"],))
-                fin_m = qone(conn, "SELECT COUNT(*) as cnt FROM matches WHERE matchday_id=%s AND home_score IS NOT NULL", (md["id"],))
-                if total_m and fin_m and total_m["cnt"] == fin_m["cnt"] > 0:
-                    est_pts = compute_estimate_points(stats["points"], est["estimated_score"])
+            if est_val and md_completion.get(md["id"]):
+                est_pts = compute_estimate_points(stats["points"], est_val)
             total += stats["points"] + est_pts
             cumul.append(total)
         cumul_data[u["username"]] = cumul
@@ -1043,28 +1091,32 @@ async def stats_page(request: Request, season_id: int):
     for uname in cumul_data:
         cumul_data[uname] = cumul_data[uname][:last_active]
 
-    # ── Némésis : équipe avec le plus de 0 pts ──────────────────
-    nemesis_data = {}
-    for u in users_list:
-        team_zeros = {}
-        rows = qall(conn, """
-            SELECT m.home_team, m.away_team,
-                   p.home_score as pred_home, p.away_score as pred_away,
-                   m.home_score as real_home, m.away_score as real_away
-            FROM pronostics p JOIN matches m ON m.id=p.match_id
-            JOIN matchdays md ON md.id=m.matchday_id
-            WHERE p.user_id=%s AND md.season_id=%s AND m.home_score IS NOT NULL
-        """, (u["id"], season_id))
-        for r in rows:
-            pts = compute_points(r["real_home"], r["real_away"], r["pred_home"], r["pred_away"])
-            if pts["points"] == 0:
+    # ── Némésis — une seule requête pour tous les joueurs ───────
+    all_pronos_full = qall(conn, """
+        SELECT p.user_id, m.home_team, m.away_team,
+               p.home_score as pred_home, p.away_score as pred_away,
+               m.home_score as real_home, m.away_score as real_away
+        FROM pronostics p JOIN matches m ON m.id=p.match_id
+        JOIN matchdays md ON md.id=m.matchday_id
+        WHERE md.season_id=%s AND m.home_score IS NOT NULL
+    """, (season_id,))
+
+    nemesis_data = {u["username"]: {"team": "—", "count": 0} for u in users_list}
+    user_team_zeros = defaultdict(lambda: defaultdict(int))
+    user_id_to_name = {u["id"]: u["username"] for u in users_list}
+
+    for r in all_pronos_full:
+        pts = compute_points(r["real_home"], r["real_away"], r["pred_home"], r["pred_away"])
+        if pts["points"] == 0:
+            uname = user_id_to_name.get(r["user_id"])
+            if uname:
                 for team in [r["home_team"], r["away_team"]]:
-                    team_zeros[team] = team_zeros.get(team, 0) + 1
+                    user_team_zeros[uname][team] += 1
+
+    for uname, team_zeros in user_team_zeros.items():
         if team_zeros:
             worst = max(team_zeros, key=lambda t: team_zeros[t])
-            nemesis_data[u["username"]] = {"team": worst, "count": team_zeros[worst]}
-        else:
-            nemesis_data[u["username"]] = {"team": "—", "count": 0}
+            nemesis_data[uname] = {"team": worst, "count": team_zeros[worst]}
 
     # ── Stats insolites ──────────────────────────────────────────
     # 1. Dernière victoire de journée (classé 1er seul)
@@ -1130,33 +1182,33 @@ async def stats_page(request: Request, season_id: int):
     pif_scores = {u["username"]: 0 for u in users_list}
     total_pronos = {u["username"]: 0 for u in users_list}
 
-    all_matches = qall(conn, """
-        SELECT m.id FROM matches m
+    # Une seule requête pour tous les pronostics
+    all_match_pronos = qall(conn, """
+        SELECT p.user_id, p.match_id, p.home_score, p.away_score, u.username
+        FROM pronostics p
+        JOIN users u ON u.id=p.user_id
+        JOIN matches m ON m.id=p.match_id
         JOIN matchdays md ON md.id=m.matchday_id
         WHERE md.season_id=%s AND m.home_score IS NOT NULL
+        ORDER BY p.match_id
     """, (season_id,))
 
-    for match in all_matches:
-        mid = match["id"]
-        match_pronos = qall(conn, """
-            SELECT p.user_id, p.home_score, p.away_score, u.username
-            FROM pronostics p JOIN users u ON u.id=p.user_id
-            WHERE p.match_id=%s
-        """, (mid,))
-        if len(match_pronos) < 2: continue
+    from collections import Counter
+    # Grouper par match_id
+    by_match = defaultdict(list)
+    for p in all_match_pronos:
+        by_match[p["match_id"]].append(p)
 
-        # Outcome majority
-        from collections import Counter
+    for mid, match_pronos in by_match.items():
+        if len(match_pronos) < 2: continue
         outcomes = []
         for mp in match_pronos:
             if mp["home_score"] > mp["away_score"]: o = "H"
             elif mp["home_score"] < mp["away_score"]: o = "A"
             else: o = "D"
             outcomes.append((mp["username"], o))
-
         outcome_counts = Counter(o for _, o in outcomes)
         majority_outcome = outcome_counts.most_common(1)[0][0]
-
         for uname, o in outcomes:
             total_pronos[uname] = total_pronos.get(uname, 0) + 1
             if o == majority_outcome:
@@ -1460,6 +1512,110 @@ async def admin_debug(request: Request):
     <p style="color:#8b949e;font-size:.8rem">UTC : {utcnow_str()}</p>
     </body></html>"""
     return HTMLResponse(html)
+
+# ─── Export CSV & Mail ───────────────────────────────────────────────────────
+
+import smtplib
+import csv
+import io
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+
+SMTP_FROM = os.environ.get("SMTP_FROM", "pronos.ente.va@gmail.com")
+SMTP_TO   = os.environ.get("SMTP_TO",   "pronos.ente.va@gmail.com")
+SMTP_PASS = os.environ.get("SMTP_PASS", "")
+
+def send_csv_backup(season_name: str, matchday_label: str, csv_content: str):
+    """Envoie le CSV par mail via Gmail SMTP."""
+    if not SMTP_PASS:
+        print("SMTP_PASS non défini, mail non envoyé.")
+        return False
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = SMTP_FROM
+        msg["To"] = SMTP_TO
+        msg["Subject"] = f"[ENTE Pronos] Backup {season_name} — {matchday_label}"
+        body = f"Backup automatique des pronostics.\n\nSaison : {season_name}\nJournée : {matchday_label}"
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+        # Pièce jointe CSV
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(csv_content.encode("utf-8"))
+        encoders.encode_base64(part)
+        filename = f"pronos_{season_name.replace(' ','_')}_{matchday_label.replace(' ','_')}.csv"
+        part.add_header("Content-Disposition", f"attachment; filename={filename}")
+        msg.attach(part)
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(SMTP_FROM, SMTP_PASS)
+            server.sendmail(SMTP_FROM, SMTP_TO, msg.as_string())
+        print(f"Mail backup envoyé : {filename}")
+        return True
+    except Exception as e:
+        print(f"Erreur envoi mail: {e}")
+        return False
+
+def generate_pronos_csv(season_id: int, matchday_id: int, conn) -> str:
+    """Génère un CSV des pronostics d'une journée."""
+    rows = qall(conn, """
+        SELECT u.username, m.home_team, m.away_team, m.kickoff_time,
+               p.home_score as pred_home, p.away_score as pred_away,
+               m.home_score as real_home, m.away_score as real_away
+        FROM pronostics p
+        JOIN users u ON u.id=p.user_id
+        JOIN matches m ON m.id=p.match_id
+        WHERE m.matchday_id=%s
+        ORDER BY u.username, m.kickoff_time
+    """, (matchday_id,))
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow(["Joueur", "Domicile", "Extérieur", "Coup d'envoi",
+                     "Prono Dom", "Prono Ext", "Score Dom", "Score Ext"])
+    for r in rows:
+        writer.writerow([
+            r["username"], r["home_team"], r["away_team"], r["kickoff_time"],
+            r["pred_home"], r["pred_away"],
+            r["real_home"] if r["real_home"] is not None else "",
+            r["real_away"] if r["real_away"] is not None else "",
+        ])
+    return output.getvalue()
+
+@app.get("/admin/export-csv/{matchday_id}")
+async def admin_export_csv(request: Request, matchday_id: int):
+    """Télécharger le CSV d'une journée."""
+    require_admin(request)
+    conn = get_db()
+    md = qone(conn, "SELECT * FROM matchdays WHERE id=%s", (matchday_id,))
+    season = qone(conn, "SELECT * FROM seasons WHERE id=%s", (md["season_id"],)) if md else None
+    if not md or not season:
+        release_db(conn)
+        return JSONResponse({"error": "Journée introuvable"}, status_code=404)
+    csv_content = generate_pronos_csv(season["id"], matchday_id, conn)
+    release_db(conn)
+    from fastapi.responses import Response
+    filename = f"pronos_{season['name'].replace(' ','_')}_{md['label'] or 'J'+str(md['number'])}.csv"
+    return Response(
+        content=csv_content.encode("utf-8"),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@app.post("/admin/send-backup/{matchday_id}")
+async def admin_send_backup(request: Request, matchday_id: int):
+    """Envoie le backup CSV par mail."""
+    require_admin(request)
+    conn = get_db()
+    md = qone(conn, "SELECT * FROM matchdays WHERE id=%s", (matchday_id,))
+    season = qone(conn, "SELECT * FROM seasons WHERE id=%s", (md["season_id"],)) if md else None
+    if not md or not season:
+        release_db(conn)
+        return JSONResponse({"error": "Journée introuvable"}, status_code=404)
+    csv_content = generate_pronos_csv(season["id"], matchday_id, conn)
+    release_db(conn)
+    label = md["label"] or f"J{md['number']}"
+    ok = send_csv_backup(season["name"], label, csv_content)
+    return JSONResponse({"ok": ok})
+
 
 # ─── Réactions chat ──────────────────────────────────────────────────────────
 
