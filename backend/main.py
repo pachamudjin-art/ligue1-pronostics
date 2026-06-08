@@ -1578,6 +1578,15 @@ async def push_unsubscribe(request: Request):
     release_db(conn)
     return JSONResponse({"ok": True})
 
+@app.get("/admin/reset-notif-log")
+async def reset_notif_log(request: Request):
+    require_admin(request)
+    conn = get_db()
+    q(conn, "DELETE FROM notification_log")
+    conn.commit()
+    release_db(conn)
+    return JSONResponse({"ok": True, "message": "Log notifications réinitialisé"})
+
 @app.get("/admin/cron-notify-debug")
 async def cron_notify_debug(request: Request):
     """Debug : voir ce que le cron verrait."""
