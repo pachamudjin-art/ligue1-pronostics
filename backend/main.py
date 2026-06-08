@@ -220,7 +220,7 @@ async def change_theme(request: Request, theme: str = Form(...)):
     user = get_current_user(request)
     if not user:
         return RedirectResponse("/login", status_code=303)
-    valid_themes = ["ligue1", "nuit-bleue", "rouge-passion", "neon", "minimaliste", "glassmorphism", "terrain", "ardoise", "brume", "l1classic"]
+    valid_themes = ["ligue1", "nuit-bleue", "rouge-passion", "neon", "minimaliste", "glassmorphism", "terrain", "ardoise", "brume", "l1classic", "pasunappli", "applidemerde"]
     if theme not in valid_themes:
         theme = "ligue1"
     conn = get_db()
