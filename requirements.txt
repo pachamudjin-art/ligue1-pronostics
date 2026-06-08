@@ -5,3 +5,5 @@ python-multipart==0.0.9
 starlette[full]==0.37.2
 itsdangerous==2.2.0
 psycopg2==2.9.9
+
+pywebpush==2.0.0
