@@ -1621,11 +1621,26 @@ async def cron_notify(request: Request):
                                (md["matchday_id"], notif_type))
                 if already:
                     continue
-                # Envoyer à tous les abonnés
+                # Envoyer uniquement aux abonnés qui n'ont pas complété leurs pronos
+                # Compter les matchs de la journée
+                matches_count = qone(conn, """
+                    SELECT COUNT(*) as cnt FROM matches WHERE matchday_id=%s
+                """, (md["matchday_id"],))
+                nb_matches = matches_count["cnt"] if matches_count else 0
+
                 title = f"⚽ {label} dans {hours_before}h !"
                 body = f"Début de la {label} dans {hours_before} heure{'s' if hours_before > 1 else ''}, fais tes pronos !"
                 ok_count = 0
                 for sub in subscriptions:
+                    # Vérifier si ce joueur a tous ses pronos
+                    pronos_count = qone(conn, """
+                        SELECT COUNT(*) as cnt FROM pronostics p
+                        JOIN matches m ON m.id=p.match_id
+                        WHERE p.user_id=%s AND m.matchday_id=%s
+                    """, (sub["user_id"], md["matchday_id"]))
+                    nb_pronos = pronos_count["cnt"] if pronos_count else 0
+                    if nb_pronos >= nb_matches:
+                        continue  # Pronos complets, pas de notification
                     if send_push_notification(sub["endpoint"], sub["p256dh"], sub["auth"], title, body):
                         ok_count += 1
                 # Logger l'envoi
