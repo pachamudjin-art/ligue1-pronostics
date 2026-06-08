@@ -44,6 +44,12 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=os.environ.get("SECRET_KEY", "changeme-in-production-please")
 )
+@app.get("/sw.js", include_in_schema=False)
+async def service_worker():
+    from fastapi.responses import Response
+    sw = "self.addEventListener('push',e=>{let d={title:'ENTE Pronos',body:'Notification'};try{d=JSON.parse(e.data.text())}catch(x){}e.waitUntil(self.registration.showNotification(d.title,{body:d.body,vibrate:[200,100,200],tag:'pronos'}))});self.addEventListener('notificationclick',e=>{e.notification.close();e.waitUntil(clients.openWindow('/'))});"
+    return Response(content=sw, media_type="application/javascript", headers={"Service-Worker-Allowed": "/"})
+
 app.mount("/static", StaticFiles(directory=os.path.join(FRONTEND_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(FRONTEND_DIR, "templates"))
 
