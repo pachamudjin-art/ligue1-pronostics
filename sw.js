@@ -1,6 +1,6 @@
 // Service Worker — Notifications Push ENTE Pronos
 self.addEventListener("push", event => {
-  let data = { title: "⚽ ENTE Pronos", body: "Nouvelle notification" };
+  let data = { "title: "⚽ ENTE Pronos" , body: "Nouvelle notification" };
   try { data = JSON.parse(event.data.text()); } catch(e) {}
   event.waitUntil(
     self.registration.showNotification(data.title, {
