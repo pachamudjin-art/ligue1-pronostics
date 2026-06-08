@@ -698,7 +698,7 @@ async function submitPodium(e, seasonId) {
 async function initPushNotifications() {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
   try {
-    const reg = await navigator.serviceWorker.register("/static/sw.js");
+    const reg = await navigator.serviceWorker.register("/sw.js");
     const existing = await reg.pushManager.getSubscription();
     if (existing) {
       // Déjà abonné — s'assurer que le serveur a bien la subscription
