@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Championnat des pronos - ENTE{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ENTE Pronos">
+  <link rel="apple-touch-icon" href="/static/icon-192.svg">
+  <meta name="theme-color" content="#e8c45a">
+  {% block head %}{% endblock %}
+</head>
+<body data-theme="{{ user.theme if user and user.theme else 'ligue1' }}">
+
+{% if user %}
+<nav>
+  <a class="nav-brand" href="/">🏆 PRONOS ENTE</a>
+  <div class="nav-links">
+    {% if season %}
+    <a href="/saison/{{ season.id }}/journee/1" {% if request.url.path.startswith('/saison') and '/journee/' in request.url.path %}class="active"{% endif %}>Journées</a>
+    <a href="/saison/{{ season.id }}/classement" {% if '/classement' in request.url.path %}class="active"{% endif %}>Classement</a>
+    {% else %}
+    <a href="/">Journées</a>
+    <a href="/classement">Classement</a>
+    {% endif %}
+    {% if season and season.competition_type == 'league' %}
+    <a href="/saison/{{ season.id }}/stats" {% if '/stats' in request.url.path %}class="active"{% endif %}>📊 Stats</a>
+    {% endif %}
+    <a href="/hall-of-fame" {% if request.url.path == '/hall-of-fame' %}class="active"{% endif %}>🏆 Hall of Fame</a>
+    {% if user.is_admin %}
+    <a href="/admin" {% if request.url.path.startswith('/admin') %}class="active"{% endif %}>⚙ Admin</a>
+    {% endif %}
+  </div>
+  <div class="nav-user">
+    <strong>{{ user.username }}</strong>
+    <a href="/profil" class="btn btn-secondary btn-sm">👤</a>
+    <a href="/logout" class="btn btn-secondary btn-sm">Déco</a>
+  </div>
+</nav>
+
+<!-- ── Chat flottant ───────────────────────────────────────── -->
+<button id="chat-fab" onclick="toggleChat()" title="Vestiaire">
+  💬
+  <span id="chat-notif" class="chat-notif" style="display:none"></span>
+</button>
+
+<div id="chat-panel" class="chat-panel">
+  <div class="chat-panel-header">
+    <span>💬 Vestiaire</span>
+    <button onclick="toggleChat()" class="chat-close-btn">✕</button>
+  </div>
+  <div id="chat-box" class="chat-panel-messages"></div>
+  <div id="emoji-picker" class="emoji-picker" style="display:none">
+    <div class="emoji-grid">
+      {% set emojis = ["😀","😂","🤣","😍","🥰","😎","🤩","😭","😤","🤬","👍","👎","👏","🙌","🤝","💪","🎯","🔥","💥","⚽","🏆","🥇","🎉","🎊","👑","😱","🤔","😴","🤤","😋","🤭","🙄","😅","😬","🫡","🤡","💩","👻","🎭","🍾","🍻","🫶","❤️","💛","💙","🖤","⭐","✨","💫","🌟"] %}
+      {% for e in emojis %}
+      <button class="emoji-btn" onclick="insertEmoji('{{ e }}')">{{ e }}</button>
+      {% endfor %}
+    </div>
+  </div>
+  <div id="gif-picker" class="gif-picker" style="display:none">
+    <input type="text" id="gif-search" class="gif-search-input" placeholder="Rechercher un GIF…"
+           oninput="searchGifs(this.value)">
+    <div id="gif-results" class="gif-results"></div>
+  </div>
+  <div class="chat-panel-input">
+    <div class="chat-input-toolbar">
+      <button class="chat-tool-btn" onclick="toggleEmojiPicker()" title="Émojis">😊</button>
+      <button class="chat-tool-btn" onclick="toggleGifPicker()" title="GIFs">GIF</button>
+    </div>
+    <div class="chat-input-row">
+      <input id="chat-input" type="text" maxlength="500" placeholder="Message…"
+             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}">
+      <button class="btn btn-primary btn-sm" onclick="sendChatMsg()">▶</button>
+    </div>
+  </div>
+</div>
+<div id="chat-overlay" class="chat-overlay" onclick="toggleChat()"></div>
+
+{% endif %}
+
+{% block content %}{% endblock %}
+
+<div id="toast"></div>
+<script src="/static/js/app.js"></script>
+{% if user %}
+<script>
+  window.CHAT_USER = "{{ user.username }}";
+  window.CHAT_IS_ADMIN = {{ 'true' if user.is_admin else 'false' }};
+  initFloatingChat();
+</script>
+{% endif %}
+{% block scripts %}{% endblock %}
+</body>
+</html>
