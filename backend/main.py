@@ -1578,6 +1578,40 @@ async def push_unsubscribe(request: Request):
     release_db(conn)
     return JSONResponse({"ok": True})
 
+@app.get("/admin/cron-notify-debug")
+async def cron_notify_debug(request: Request):
+    """Debug : voir ce que le cron verrait."""
+    require_admin(request)
+    conn = get_db()
+    now = datetime.now(timezone.utc)
+    upcoming = qall(conn, """
+        SELECT md.id as matchday_id, md.number, md.label,
+               MIN(m.kickoff_time) as first_kickoff
+        FROM matchdays md
+        JOIN matches m ON m.matchday_id=md.id
+        JOIN seasons s ON s.id=md.season_id
+        WHERE s.is_active=1 AND m.kickoff_time > to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS')
+        GROUP BY md.id, md.number, md.label
+        ORDER BY first_kickoff LIMIT 3
+    """)
+    subs = qall(conn, "SELECT id, user_id FROM push_subscriptions")
+    result = []
+    for md in upcoming:
+        try:
+            ko = datetime.fromisoformat(md["first_kickoff"].replace(" ", "T") + "+00:00")
+            diff_hours = (ko - now).total_seconds() / 3600
+        except Exception as e:
+            diff_hours = -1
+        result.append({
+            "matchday": md["label"] or f"J{md['number']}",
+            "first_kickoff": md["first_kickoff"],
+            "diff_hours": round(diff_hours, 2),
+            "in_24h_window": 23 < diff_hours <= 24,
+            "in_2h_window": 1 < diff_hours <= 2,
+        })
+    release_db(conn)
+    return JSONResponse({"now_utc": now.isoformat(), "upcoming": result, "subscriptions": len(subs)})
+
 @app.post("/admin/cron-notify")
 async def cron_notify(request: Request):
     """Appelé par cron-job.org toutes les heures — envoie les notifications si nécessaire."""
