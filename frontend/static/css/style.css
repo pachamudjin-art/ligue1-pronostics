@@ -1328,3 +1328,202 @@ body[data-theme="l1classic"] .login-box { background: rgba(255,255,255,.92); bor
 body[data-theme="l1classic"] .login-title { color: var(--accent); }
 body[data-theme="l1classic"] .badge-pp { background: var(--accent); color: #fff; }
 body[data-theme="l1classic"] .journee-nav select { background: rgba(255,255,255,.9); color: var(--text); }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Thème "Pas une appli de prono"
+   ═══════════════════════════════════════════════════════════════ */
+body[data-theme="pasunappli"] {
+  --bg:        #0f0e17;
+  --surface:   #1a1a2e;
+  --surface2:  #16213e;
+  --border:    rgba(255,90,95,.2);
+  --accent:    #ff5a5f;
+  --accent2:   #ffb347;
+  --text:      #fffffe;
+  --muted:     #a7a9be;
+  --green:     #00d4aa;
+  --shadow:    0 8px 40px rgba(255,90,95,.15);
+}
+
+body[data-theme="pasunappli"] {
+  background: #0f0e17;
+  background-image:
+    radial-gradient(ellipse at 80% 10%, rgba(255,90,95,.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 10% 90%, rgba(255,179,71,.1) 0%, transparent 50%);
+  background-attachment: fixed;
+}
+
+/* Navbar — bande verticale gauche sur desktop */
+body[data-theme="pasunappli"] nav {
+  background: linear-gradient(180deg, #ff5a5f 0%, #c0392b 100%);
+  border-bottom: none;
+  border-right: none;
+  box-shadow: 4px 0 24px rgba(255,90,95,.3);
+  padding: .6rem 1rem;
+}
+
+body[data-theme="pasunappli"] .nav-brand {
+  color: #fff;
+  font-size: 1.1rem;
+  font-style: italic;
+  letter-spacing: -.02em;
+}
+body[data-theme="pasunappli"] .nav-brand::before { content: "✗ "; }
+
+body[data-theme="pasunappli"] .nav-links a {
+  color: rgba(255,255,255,.85);
+  border-radius: 0;
+  border-left: 3px solid transparent;
+  padding-left: .6rem;
+}
+body[data-theme="pasunappli"] .nav-links a:hover,
+body[data-theme="pasunappli"] .nav-links a.active {
+  border-left-color: #fff;
+  background: rgba(255,255,255,.1);
+  color: #fff;
+}
+body[data-theme="pasunappli"] .nav-user { color: rgba(255,255,255,.9); }
+body[data-theme="pasunappli"] .nav-user strong { color: #fff; }
+body[data-theme="pasunappli"] .btn-secondary {
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  border-color: rgba(255,255,255,.3);
+}
+
+/* Cards — style ticket/bordereau */
+body[data-theme="pasunappli"] .card {
+  background: var(--surface);
+  border: none;
+  border-left: 4px solid var(--accent);
+  border-radius: 0 12px 12px 0;
+  box-shadow: 6px 6px 0 rgba(255,90,95,.15);
+}
+
+body[data-theme="pasunappli"] .match-card {
+  background: var(--surface);
+  border: none;
+  border-left: 4px solid var(--accent2);
+  border-radius: 0 10px 10px 0;
+  box-shadow: 4px 4px 0 rgba(255,179,71,.12);
+  transition: transform .15s, box-shadow .15s;
+}
+body[data-theme="pasunappli"] .match-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 rgba(255,179,71,.2);
+}
+
+body[data-theme="pasunappli"] h1 {
+  color: var(--accent);
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-size: 2rem;
+}
+body[data-theme="pasunappli"] h2 { color: var(--accent2); }
+
+body[data-theme="pasunappli"] .btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 0;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-weight: 700;
+  box-shadow: 3px 3px 0 rgba(255,90,95,.4);
+}
+body[data-theme="pasunappli"] .btn-primary:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 rgba(255,90,95,.5);
+}
+
+body[data-theme="pasunappli"] .pts-cell { color: var(--accent); font-style: italic; }
+body[data-theme="pasunappli"] .ranking-table th {
+  background: rgba(255,90,95,.15);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  border-bottom: 2px solid var(--accent);
+}
+body[data-theme="pasunappli"] #chat-fab {
+  background: var(--accent);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 rgba(255,90,95,.4);
+}
+body[data-theme="pasunappli"] .score-display {
+  border-color: var(--accent);
+  color: var(--text);
+  border-radius: 0;
+}
+body[data-theme="pasunappli"] .estimation-card {
+  border-left: 4px solid var(--accent2);
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  background: rgba(255,179,71,.06);
+  border-radius: 0 10px 10px 0;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Thème "Appli de merde"
+   ═══════════════════════════════════════════════════════════════ */
+body[data-theme="applidemerde"] {
+  --bg:        #1a0a2e;
+  --surface:   rgba(30,15,50,.85);
+  --surface2:  rgba(40,20,60,.8);
+  --border:    rgba(180,100,255,.25);
+  --accent:    #c084fc;
+  --accent2:   #7c3aed;
+  --text:      #f5f0ff;
+  --muted:     #a78bca;
+  --green:     #4ade80;
+  --shadow:    0 4px 20px rgba(124,58,237,.3);
+}
+
+body[data-theme="applidemerde"] {
+  background-color: #1a0a2e;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%231a0a2e'/%3E%3Ctext x='50' y='80' font-family='Arial' font-size='42' fill='%23c084fc' opacity='0.18' transform='rotate(-15,50,80)'%3EAPPLI DE MERDE%3C/text%3E%3Ctext x='200' y='180' font-family='Georgia' font-size='28' fill='%239333ea' opacity='0.22' transform='rotate(8,200,180)'%3Eappli de merde%3C/text%3E%3Ctext x='-30' y='260' font-family='Courier New' font-size='55' fill='%23a855f7' opacity='0.14' transform='rotate(-5,-30,260)'%3EAPPLI DE MERDE%3C/text%3E%3Ctext x='350' y='130' font-family='Impact' font-size='22' fill='%23c084fc' opacity='0.2' transform='rotate(25,350,130)'%3Eappli de merde%3C/text%3E%3Ctext x='100' y='350' font-family='Arial Black' font-size='36' fill='%237c3aed' opacity='0.2' transform='rotate(-20,100,350)'%3EAPPLI DE MERDE%3C/text%3E%3Ctext x='450' y='300' font-family='Georgia' font-size='18' fill='%23d8b4fe' opacity='0.25' transform='rotate(10,450,300)'%3Eappli de merde%3C/text%3E%3Ctext x='600' y='420' font-family='Courier New' font-size='48' fill='%239333ea' opacity='0.16' transform='rotate(-30,600,420)'%3EMERDE%3C/text%3E%3Ctext x='20' y='480' font-family='Arial' font-size='30' fill='%23c084fc' opacity='0.18' transform='rotate(12,20,480)'%3Eappli de merde%3C/text%3E%3Ctext x='300' y='550' font-family='Impact' font-size='60' fill='%237c3aed' opacity='0.12' transform='rotate(-8,300,550)'%3EAPPLI DE MERDE%3C/text%3E%3Ctext x='550' y='80' font-family='Georgia' font-size='16' fill='%23d8b4fe' opacity='0.3' transform='rotate(35,550,80)'%3Eappli de merde%3C/text%3E%3Ctext x='650' y='200' font-family='Arial' font-size='24' fill='%23a855f7' opacity='0.2' transform='rotate(-42,650,200)'%3EMERDE%3C/text%3E%3Ctext x='150' y='150' font-family='Courier New' font-size='12' fill='%23c084fc' opacity='0.35' transform='rotate(18,150,150)'%3Eappli de merde appli de merde%3C/text%3E%3Ctext x='400' y='460' font-family='Arial Black' font-size='20' fill='%239333ea' opacity='0.22' transform='rotate(-25,400,460)'%3EAPPLI DE MERDE%3C/text%3E%3Ctext x='0' y='560' font-family='Impact' font-size='35' fill='%23d8b4fe' opacity='0.14' transform='rotate(5,0,560)'%3Eappli de merde%3C/text%3E%3C/svg%3E");
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+body[data-theme="applidemerde"] nav {
+  background: rgba(26,10,46,.9);
+  backdrop-filter: blur(12px);
+  border-bottom: 2px solid rgba(192,132,252,.3);
+}
+body[data-theme="applidemerde"] .nav-brand {
+  color: var(--accent);
+  text-shadow: 0 0 15px rgba(192,132,252,.5);
+}
+body[data-theme="applidemerde"] .nav-brand::after { content: " 💩"; }
+body[data-theme="applidemerde"] .nav-links a { color: var(--muted); }
+body[data-theme="applidemerde"] .nav-links a:hover,
+body[data-theme="applidemerde"] .nav-links a.active {
+  color: var(--accent);
+  background: rgba(192,132,252,.1);
+}
+body[data-theme="applidemerde"] .card,
+body[data-theme="applidemerde"] .match-card {
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+  border-color: rgba(192,132,252,.2);
+}
+body[data-theme="applidemerde"] h1 {
+  color: var(--accent);
+  text-shadow: 0 0 20px rgba(192,132,252,.4);
+}
+body[data-theme="applidemerde"] .btn-primary { background: var(--accent2); color: #fff; }
+body[data-theme="applidemerde"] .pts-cell { color: var(--accent); }
+body[data-theme="applidemerde"] .ranking-table th {
+  background: rgba(192,132,252,.1);
+  color: var(--accent);
+}
+body[data-theme="applidemerde"] #chat-fab {
+  background: var(--accent2);
+  box-shadow: 0 4px 20px rgba(124,58,237,.5);
+}
+body[data-theme="applidemerde"] .chat-panel {
+  background: rgba(26,10,46,.95);
+  backdrop-filter: blur(20px);
+}
