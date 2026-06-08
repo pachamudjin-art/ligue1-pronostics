@@ -692,3 +692,79 @@ async function submitPodium(e, seasonId) {
     toast("Erreur réseau", "err");
   }
 }
+
+
+// ── Notifications Push ────────────────────────────────────────
+async function initPushNotifications() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.register("/static/sw.js");
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) {
+      // Déjà abonné — s'assurer que le serveur a bien la subscription
+      await fetch("/push/subscribe", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(existing.toJSON())
+      });
+      updateNotifToggle(true);
+      return;
+    }
+    updateNotifToggle(false);
+  } catch(e) { console.log("Push non disponible:", e); }
+}
+
+async function togglePushNotifications() {
+  if (!("serviceWorker" in navigator)) {
+    toast("Notifications non supportées par ce navigateur", "err"); return;
+  }
+  const reg = await navigator.serviceWorker.ready;
+  const existing = await reg.pushManager.getSubscription();
+  if (existing) {
+    // Désabonner
+    await existing.unsubscribe();
+    await fetch("/push/unsubscribe", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({endpoint: existing.endpoint})
+    });
+    updateNotifToggle(false);
+    toast("Notifications désactivées", "ok");
+  } else {
+    // Demander permission + abonner
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") { toast("Permission refusée", "err"); return; }
+    const keyRes = await fetch("/push/vapid-public-key");
+    const { publicKey } = await keyRes.json();
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    });
+    await fetch("/push/subscribe", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(sub.toJSON())
+    });
+    updateNotifToggle(true);
+    toast("✓ Notifications activées !", "ok");
+  }
+}
+
+function updateNotifToggle(active) {
+  const btn = document.getElementById("notif-toggle-btn");
+  if (!btn) return;
+  btn.textContent = active ? "🔔 Notifs ON" : "🔕 Notifs OFF";
+  btn.style.opacity = active ? "1" : "0.6";
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+// Initialiser au chargement
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initPushNotifications);
+} else {
+  initPushNotifications();
+}
