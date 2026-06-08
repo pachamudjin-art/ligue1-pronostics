@@ -51,14 +51,14 @@ def compute_podium_points(real_rank1, real_rank2, real_rank3, pred_rank1, pred_r
         if real_place is None:
             detail.append({"team": team, "pred_place": pred_place, "real_place": None, "points": 0})
         elif pred_place == 1 and real_place == 1:
-            detail.append({"team": team, "pred_place": 1, "real_place": 1, "points": 10})
-            total += 10
+            detail.append({"team": team, "pred_place": 1, "real_place": 1, "points": 20})
+            total += 20
         elif pred_place == real_place:
-            detail.append({"team": team, "pred_place": pred_place, "real_place": real_place, "points": 5})
-            total += 5
+            detail.append({"team": team, "pred_place": pred_place, "real_place": real_place, "points": 10})
+            total += 10
         else:
-            detail.append({"team": team, "pred_place": pred_place, "real_place": real_place, "points": 3})
-            total += 3
+            detail.append({"team": team, "pred_place": pred_place, "real_place": real_place, "points": 6})
+            total += 6
 
     return {"points": total, "detail": detail}
 
