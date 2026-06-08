@@ -1513,6 +1513,125 @@ async def admin_debug(request: Request):
     </body></html>"""
     return HTMLResponse(html)
 
+# ─── Notifications Push ──────────────────────────────────────────────────────
+
+VAPID_PUBLIC_KEY  = os.environ.get("VAPID_PUBLIC_KEY",  "BINHFCzaBJaUu7IC6X5TP2hVJZAwExk0CSgnoHMmwY2kdqd_3eLl9_Ug96ww656cWrxW3uOVTYHjDmSMCnwRAE0")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "g4lZjEZoksbqJhEQ81uN2TJuajDHPNPZcLtkZuNchWA")
+VAPID_CLAIMS      = {"sub": "mailto:pronos.ente.va@gmail.com"}
+
+def send_push_notification(endpoint: str, p256dh: str, auth: str, title: str, body: str) -> bool:
+    try:
+        from pywebpush import webpush, WebPushException
+        import json
+        webpush(
+            subscription_info={"endpoint": endpoint, "keys": {"p256dh": p256dh, "auth": auth}},
+            data=json.dumps({"title": title, "body": body}),
+            vapid_private_key=VAPID_PRIVATE_KEY,
+            vapid_claims=VAPID_CLAIMS,
+        )
+        return True
+    except Exception as e:
+        print(f"Push error: {e}")
+        return False
+
+@app.get("/push/vapid-public-key")
+async def get_vapid_public_key():
+    return JSONResponse({"publicKey": VAPID_PUBLIC_KEY})
+
+@app.post("/push/subscribe")
+async def push_subscribe(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"ok": False}, status_code=401)
+    body = await request.json()
+    endpoint = body.get("endpoint")
+    p256dh   = body.get("keys", {}).get("p256dh")
+    auth     = body.get("keys", {}).get("auth")
+    if not endpoint or not p256dh or not auth:
+        return JSONResponse({"ok": False, "error": "Données manquantes"}, status_code=400)
+    conn = get_db()
+    q(conn, """
+        INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT(endpoint) DO UPDATE SET user_id=%s, p256dh=%s, auth=%s
+    """, (user["id"], endpoint, p256dh, auth, user["id"], p256dh, auth))
+    conn.commit()
+    release_db(conn)
+    return JSONResponse({"ok": True})
+
+@app.post("/push/unsubscribe")
+async def push_unsubscribe(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"ok": False}, status_code=401)
+    body = await request.json()
+    endpoint = body.get("endpoint")
+    conn = get_db()
+    q(conn, "DELETE FROM push_subscriptions WHERE endpoint=%s", (endpoint,))
+    conn.commit()
+    release_db(conn)
+    return JSONResponse({"ok": True})
+
+@app.post("/admin/cron-notify")
+async def cron_notify(request: Request):
+    """Appelé par cron-job.org toutes les heures — envoie les notifications si nécessaire."""
+    # Vérifier le secret pour éviter les appels non autorisés
+    secret = request.headers.get("X-Cron-Secret", "")
+    cron_secret = os.environ.get("CRON_SECRET", "")
+    if cron_secret and secret != cron_secret:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    conn = get_db()
+    now = datetime.now(timezone.utc)
+    sent = []
+
+    # Récupérer tous les premiers matchs de chaque journée active
+    upcoming = qall(conn, """
+        SELECT md.id as matchday_id, md.number, md.label, md.season_id,
+               MIN(m.kickoff_time) as first_kickoff
+        FROM matchdays md
+        JOIN matches m ON m.matchday_id=md.id
+        JOIN seasons s ON s.id=md.season_id
+        WHERE s.is_active=1 AND m.kickoff_time > to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS')
+        GROUP BY md.id, md.number, md.label, md.season_id
+        ORDER BY first_kickoff
+        LIMIT 3
+    """)
+
+    subscriptions = qall(conn, "SELECT * FROM push_subscriptions")
+
+    for md in upcoming:
+        try:
+            ko = datetime.fromisoformat(md["first_kickoff"].replace(" ", "T") + "+00:00")
+        except:
+            continue
+        diff_hours = (ko - now).total_seconds() / 3600
+        label = md["label"] or f"J{md['number']}"
+
+        for notif_type, hours_before in [("24h", 24), ("2h", 2)]:
+            if hours_before - 1 < diff_hours <= hours_before:
+                # Vérifier si déjà envoyé
+                already = qone(conn, "SELECT id FROM notification_log WHERE matchday_id=%s AND type=%s",
+                               (md["matchday_id"], notif_type))
+                if already:
+                    continue
+                # Envoyer à tous les abonnés
+                title = f"⚽ {label} dans {hours_before}h !"
+                body = f"Début de la {label} dans {hours_before} heure{'s' if hours_before > 1 else ''}, fais tes pronos !"
+                ok_count = 0
+                for sub in subscriptions:
+                    if send_push_notification(sub["endpoint"], sub["p256dh"], sub["auth"], title, body):
+                        ok_count += 1
+                # Logger l'envoi
+                q(conn, "INSERT INTO notification_log (matchday_id, type) VALUES (%s,%s) ON CONFLICT DO NOTHING",
+                  (md["matchday_id"], notif_type))
+                conn.commit()
+                sent.append({"matchday": label, "type": notif_type, "sent": ok_count})
+
+    release_db(conn)
+    return JSONResponse({"ok": True, "sent": sent, "checked": len(upcoming)})
+
+
 # ─── Export CSV & Mail ───────────────────────────────────────────────────────
 
 import smtplib

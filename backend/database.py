@@ -117,6 +117,19 @@ def init_db():
             emoji TEXT NOT NULL,
             created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'),
             UNIQUE(message_id, user_id, emoji))""",
+        """CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            endpoint TEXT NOT NULL UNIQUE,
+            p256dh TEXT NOT NULL,
+            auth TEXT NOT NULL,
+            created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
+        """CREATE TABLE IF NOT EXISTS notification_log (
+            id SERIAL PRIMARY KEY,
+            matchday_id INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            sent_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'),
+            UNIQUE(matchday_id, type))""",
         # Table résultat podium réel
         """CREATE TABLE IF NOT EXISTS podium_results (
             id SERIAL PRIMARY KEY,
@@ -144,6 +157,19 @@ def init_db():
             emoji TEXT NOT NULL,
             created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'),
             UNIQUE(message_id, user_id, emoji))""",
+        """CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            endpoint TEXT NOT NULL UNIQUE,
+            p256dh TEXT NOT NULL,
+            auth TEXT NOT NULL,
+            created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
+        """CREATE TABLE IF NOT EXISTS notification_log (
+            id SERIAL PRIMARY KEY,
+            matchday_id INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            sent_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'),
+            UNIQUE(matchday_id, type))""",
     ]
     for m in migrations:
         try: c.execute(m)
