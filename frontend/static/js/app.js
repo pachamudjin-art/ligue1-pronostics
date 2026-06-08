@@ -723,10 +723,17 @@ async function togglePushNotifications() {
   }
   let reg;
   try {
-    reg = await Promise.race([
-      navigator.serviceWorker.ready,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000))
-    ]);
+    reg = await navigator.serviceWorker.register("/sw.js", {scope: "/"});
+    if (reg.installing || reg.waiting) {
+      await new Promise(resolve => {
+        const sw = reg.installing || reg.waiting;
+        sw.addEventListener("statechange", function() {
+          if (this.state === "activated") resolve();
+        });
+        setTimeout(resolve, 4000);
+      });
+    }
+    reg = await navigator.serviceWorker.ready;
   } catch(e) {
     toast("Erreur service worker: " + e.message, "err"); return;
   }
