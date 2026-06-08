@@ -715,10 +715,21 @@ async function initPushNotifications() {
 }
 
 async function togglePushNotifications() {
-  if (!("serviceWorker" in navigator)) {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
     toast("Notifications non supportées par ce navigateur", "err"); return;
   }
-  const reg = await navigator.serviceWorker.ready;
+  if (Notification.permission === "denied") {
+    toast("Notifications bloquées — autorisez-les dans les réglages du navigateur", "err"); return;
+  }
+  let reg;
+  try {
+    reg = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000))
+    ]);
+  } catch(e) {
+    toast("Erreur service worker: " + e.message, "err"); return;
+  }
   const existing = await reg.pushManager.getSubscription();
   if (existing) {
     // Désabonner
