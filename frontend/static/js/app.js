@@ -723,7 +723,7 @@ async function togglePushNotifications() {
   }
   let reg;
   try {
-    reg = await navigator.serviceWorker.register("/sw.js", {scope: "/"});
+    reg = await navigator.serviceWorker.register("/sw.js");
     if (reg.installing || reg.waiting) {
       await new Promise(resolve => {
         const sw = reg.installing || reg.waiting;
