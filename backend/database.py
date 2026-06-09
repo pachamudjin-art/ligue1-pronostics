@@ -110,6 +110,14 @@ def init_db():
             joueur TEXT NOT NULL,
             points INTEGER,
             created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
+        """CREATE TABLE IF NOT EXISTS user_notifications (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) UNIQUE,
+            email TEXT,
+            telegram_chat_id TEXT,
+            notify_24h INTEGER DEFAULT 1,
+            notify_2h INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
         """CREATE TABLE IF NOT EXISTS chat_reactions (
             id SERIAL PRIMARY KEY,
             message_id INTEGER NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
@@ -117,6 +125,14 @@ def init_db():
             emoji TEXT NOT NULL,
             created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'),
             UNIQUE(message_id, user_id, emoji))""",
+        """CREATE TABLE IF NOT EXISTS user_notifications (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) UNIQUE,
+            email TEXT,
+            telegram_chat_id TEXT,
+            notify_24h INTEGER DEFAULT 1,
+            notify_2h INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
         """CREATE TABLE IF NOT EXISTS push_subscriptions (
             id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL REFERENCES users(id),
@@ -150,6 +166,14 @@ def init_db():
             id SERIAL PRIMARY KEY, type TEXT NOT NULL, num INTEGER NOT NULL,
             saison TEXT NOT NULL, joueur TEXT NOT NULL, points INTEGER,
             created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
+        """CREATE TABLE IF NOT EXISTS user_notifications (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) UNIQUE,
+            email TEXT,
+            telegram_chat_id TEXT,
+            notify_24h INTEGER DEFAULT 1,
+            notify_2h INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
         """CREATE TABLE IF NOT EXISTS chat_reactions (
             id SERIAL PRIMARY KEY,
             message_id INTEGER NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
@@ -157,6 +181,14 @@ def init_db():
             emoji TEXT NOT NULL,
             created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'),
             UNIQUE(message_id, user_id, emoji))""",
+        """CREATE TABLE IF NOT EXISTS user_notifications (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) UNIQUE,
+            email TEXT,
+            telegram_chat_id TEXT,
+            notify_24h INTEGER DEFAULT 1,
+            notify_2h INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""",
         """CREATE TABLE IF NOT EXISTS push_subscriptions (
             id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL REFERENCES users(id),

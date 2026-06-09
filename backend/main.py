@@ -213,7 +213,14 @@ async def profil_page(request: Request):
     user = get_current_user(request)
     if not user: return RedirectResponse("/login", status_code=303)
     season = get_active_season()
-    return templates.TemplateResponse("profil.html", {"request": request, "user": user, "season": season})
+    conn = get_db()
+    notif_prefs = qone(conn, "SELECT * FROM user_notifications WHERE user_id=%s", (user["id"],))
+    release_db(conn)
+    return templates.TemplateResponse("profil.html", {
+        "request": request, "user": user, "season": season,
+        "error": None, "success": None,
+        "notif_prefs": dict(notif_prefs) if notif_prefs else None,
+    })
 
 @app.post("/profil/change-theme")
 async def change_theme(request: Request, theme: str = Form(...)):
@@ -1519,6 +1526,96 @@ async def admin_debug(request: Request):
     </body></html>"""
     return HTMLResponse(html)
 
+# ─── Notifications (Email + Telegram) ───────────────────────────────────────
+
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "8689221193:AAH_LpOUTWW8JCj1IzgGx-1wcnLGZkmzpws")
+TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+
+def send_telegram(chat_id: str, text: str) -> bool:
+    """Envoie un message Telegram."""
+    try:
+        import urllib.request, urllib.parse, json
+        data = json.dumps({"chat_id": chat_id, "text": text, "parse_mode": "HTML"}).encode()
+        req = urllib.request.Request(f"{TELEGRAM_API}/sendMessage",
+                                      data=data,
+                                      headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status == 200
+    except Exception as e:
+        print(f"Telegram error: {e}")
+        return False
+
+def send_reminder_email(to_email: str, subject: str, body: str) -> bool:
+    """Envoie un email de rappel."""
+    if not SMTP_PASS or not to_email:
+        return False
+    try:
+        from email.mime.text import MIMEText
+        import smtplib
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["From"] = SMTP_FROM
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+            server.ehlo(); server.starttls(); server.ehlo()
+            server.login(SMTP_FROM, SMTP_PASS)
+            server.sendmail(SMTP_FROM, to_email, msg.as_string())
+        return True
+    except Exception as e:
+        print(f"Email error: {e}")
+        return False
+
+@app.get("/telegram/webhook-info")
+async def telegram_info(request: Request):
+    """Vérifie le statut du bot Telegram."""
+    require_admin(request)
+    import urllib.request, json
+    try:
+        with urllib.request.urlopen(f"{TELEGRAM_API}/getMe", timeout=10) as resp:
+            data = json.loads(resp.read())
+        return JSONResponse(data)
+    except Exception as e:
+        return JSONResponse({"error": str(e)})
+
+@app.get("/telegram/updates")
+async def telegram_updates(request: Request):
+    """Récupère les nouveaux messages du bot pour lier les comptes."""
+    require_admin(request)
+    import urllib.request, json
+    try:
+        with urllib.request.urlopen(f"{TELEGRAM_API}/getUpdates?limit=20", timeout=10) as resp:
+            data = json.loads(resp.read())
+        return JSONResponse(data)
+    except Exception as e:
+        return JSONResponse({"error": str(e)})
+
+@app.post("/profil/save-notifications")
+async def save_notifications(request: Request,
+                              email: str = Form(""),
+                              telegram_chat_id: str = Form(""),
+                              notify_24h: str = Form("0"),
+                              notify_2h: str = Form("0")):
+    user = get_current_user(request)
+    if not user: return RedirectResponse("/login", status_code=303)
+    conn = get_db()
+    q(conn, """
+        INSERT INTO user_notifications (user_id, email, telegram_chat_id, notify_24h, notify_2h)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT(user_id) DO UPDATE SET
+            email=EXCLUDED.email,
+            telegram_chat_id=EXCLUDED.telegram_chat_id,
+            notify_24h=EXCLUDED.notify_24h,
+            notify_2h=EXCLUDED.notify_2h
+    """, (user["id"],
+          email.strip() or None,
+          telegram_chat_id.strip() or None,
+          1 if notify_24h == "1" else 0,
+          1 if notify_2h == "1" else 0))
+    conn.commit()
+    release_db(conn)
+    return RedirectResponse("/profil?notif_saved=1", status_code=303)
+
+
 # ─── Notifications Push ──────────────────────────────────────────────────────
 
 VAPID_PUBLIC_KEY  = os.environ.get("VAPID_PUBLIC_KEY",  "BINHFCzaBJaUu7IC6X5TP2hVJZAwExk0CSgnoHMmwY2kdqd_3eLl9_Ug96ww656cWrxW3uOVTYHjDmSMCnwRAE0")
@@ -1620,8 +1717,13 @@ async def run_cron_manually(request: Request):
                     nb_pronos = pronos_count["cnt"] if pronos_count else 0
                     if nb_pronos >= nb_matches:
                         continue
-                    if send_push_notification(sub["endpoint"], sub["p256dh"], sub["auth"], title, body):
-                        ok_count += 1
+                    tg_msg = f"<b>{title}</b>\n{body_text}"
+                    if nu["telegram_chat_id"]:
+                        if send_telegram(nu["telegram_chat_id"], tg_msg):
+                            ok_count += 1
+                    elif nu["email"]:
+                        if send_reminder_email(nu["email"], title, body_text):
+                            ok_count += 1
                 q(conn, "INSERT INTO notification_log (matchday_id, type) VALUES (%s,%s) ON CONFLICT DO NOTHING",
                   (md["matchday_id"], notif_type))
                 conn.commit()
@@ -1723,20 +1825,32 @@ async def cron_notify(request: Request):
                 nb_matches = matches_count["cnt"] if matches_count else 0
 
                 title = f"⚽ {label} dans {hours_before}h !"
-                body = f"Début de la {label} dans {hours_before} heure{'s' if hours_before > 1 else ''}, fais tes pronos !"
+                body_text = f"Début de la {label} dans {hours_before} heure{'s' if hours_before > 1 else ''}, fais tes pronos ! 👉 https://l1pronos.up.railway.app"
                 ok_count = 0
-                for sub in subscriptions:
-                    # Vérifier si ce joueur a tous ses pronos
-                    pronos_count = qone(conn, """
+                # Récupérer tous les abonnés aux notifications
+                notif_users = qall(conn, """
+                    SELECT un.*, u.username FROM user_notifications un
+                    JOIN users u ON u.id=un.user_id
+                    WHERE (notify_24h=1 AND %s='24h') OR (notify_2h=1 AND %s='2h')
+                """, (notif_type, notif_type))
+                for nu in notif_users:
+                    # Vérifier si pronos complets
+                    pc = qone(conn, """
                         SELECT COUNT(*) as cnt FROM pronostics p
                         JOIN matches m ON m.id=p.match_id
                         WHERE p.user_id=%s AND m.matchday_id=%s
-                    """, (sub["user_id"], md["matchday_id"]))
-                    nb_pronos = pronos_count["cnt"] if pronos_count else 0
-                    if nb_pronos >= nb_matches:
-                        continue  # Pronos complets, pas de notification
-                    if send_push_notification(sub["endpoint"], sub["p256dh"], sub["auth"], title, body):
-                        ok_count += 1
+                    """, (nu["user_id"], md["matchday_id"]))
+                    if pc and pc["cnt"] >= nb_matches:
+                        continue
+                    # Envoyer Telegram
+                    if nu["telegram_chat_id"]:
+                        tg_msg = f"<b>{title}</b>\n{body_text}"
+                        if send_telegram(nu["telegram_chat_id"], tg_msg):
+                            ok_count += 1
+                    # Envoyer Email
+                    elif nu["email"]:
+                        if send_reminder_email(nu["email"], title, body_text):
+                            ok_count += 1
                 # Logger l'envoi
                 q(conn, "INSERT INTO notification_log (matchday_id, type) VALUES (%s,%s) ON CONFLICT DO NOTHING",
                   (md["matchday_id"], notif_type))
