@@ -1527,3 +1527,318 @@ body[data-theme="applidemerde"] .chat-panel {
   background: rgba(26,10,46,.95);
   backdrop-filter: blur(20px);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Thème "Alternative" — redesign complet
+   Layout radicalement différent
+   ═══════════════════════════════════════════════════════════════ */
+
+body[data-theme="alternative"] {
+  --bg:        #0a0a0f;
+  --surface:   #12121a;
+  --surface2:  #1a1a25;
+  --border:    rgba(120,80,255,.2);
+  --accent:    #7850ff;
+  --accent2:   #50c8ff;
+  --text:      #f0eeff;
+  --muted:     #8880aa;
+  --green:     #50ffaa;
+  --shadow:    0 0 40px rgba(120,80,255,.08);
+}
+
+/* ── Fond avec grille ────────────────────────────────────────── */
+body[data-theme="alternative"] {
+  background-color: #0a0a0f;
+  background-image:
+    linear-gradient(rgba(120,80,255,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120,80,255,.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-attachment: fixed;
+}
+
+/* ── Navbar — barre horizontale compacte style terminal ──────── */
+body[data-theme="alternative"] nav {
+  background: rgba(10,10,15,.95);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(120,80,255,.3);
+  padding: .4rem 1.5rem;
+  font-family: 'Courier New', monospace;
+}
+
+body[data-theme="alternative"] .nav-brand {
+  color: var(--accent);
+  font-family: 'Courier New', monospace;
+  font-size: .9rem;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+body[data-theme="alternative"] .nav-brand::before { content: "> "; color: var(--accent2); }
+
+body[data-theme="alternative"] .nav-links a {
+  color: var(--muted);
+  font-family: 'Courier New', monospace;
+  font-size: .78rem;
+  letter-spacing: .08em;
+  border: none;
+  background: none;
+  padding: .3rem .6rem;
+  text-transform: uppercase;
+  border-radius: 0;
+}
+body[data-theme="alternative"] .nav-links a::before { content: "[ "; color: var(--border); }
+body[data-theme="alternative"] .nav-links a::after  { content: " ]"; color: var(--border); }
+body[data-theme="alternative"] .nav-links a:hover,
+body[data-theme="alternative"] .nav-links a.active {
+  color: var(--accent2);
+  background: rgba(80,200,255,.06);
+}
+body[data-theme="alternative"] .nav-user {
+  font-family: 'Courier New', monospace;
+  font-size: .78rem;
+  color: var(--muted);
+}
+body[data-theme="alternative"] .nav-user strong { color: var(--green); }
+
+/* ── Cards — style terminal/code ─────────────────────────────── */
+body[data-theme="alternative"] .card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  position: relative;
+  overflow: visible;
+}
+body[data-theme="alternative"] .card::before {
+  content: "//";
+  position: absolute;
+  top: -10px;
+  left: 12px;
+  font-family: 'Courier New', monospace;
+  font-size: .65rem;
+  color: var(--accent);
+  background: var(--surface);
+  padding: 0 6px;
+  letter-spacing: .1em;
+}
+
+/* ── Match card — layout horizontal étendu ───────────────────── */
+body[data-theme="alternative"] .match-card {
+  background: var(--surface);
+  border: none;
+  border-left: 2px solid var(--accent);
+  border-radius: 0;
+  margin-bottom: .4rem;
+  transition: border-color .2s, background .2s;
+}
+body[data-theme="alternative"] .match-card:hover {
+  background: var(--surface2);
+  border-left-color: var(--accent2);
+}
+
+/* ── Titres oversized ────────────────────────────────────────── */
+body[data-theme="alternative"] h1 {
+  font-family: 'Courier New', monospace;
+  font-size: clamp(1.4rem, 4vw, 2.8rem);
+  font-weight: 700;
+  color: transparent;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  letter-spacing: -.02em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+body[data-theme="alternative"] h2 {
+  font-family: 'Courier New', monospace;
+  font-size: .85rem;
+  color: var(--accent2);
+  text-transform: uppercase;
+  letter-spacing: .15em;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: .4rem;
+}
+
+/* ── Boutons — style outlined ────────────────────────────────── */
+body[data-theme="alternative"] .btn-primary {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 0;
+  font-family: 'Courier New', monospace;
+  font-size: .78rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  transition: background .15s, color .15s;
+}
+body[data-theme="alternative"] .btn-primary:hover {
+  background: var(--accent);
+  color: #000;
+}
+body[data-theme="alternative"] .btn-secondary {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid rgba(120,80,255,.3);
+  border-radius: 0;
+  font-family: 'Courier New', monospace;
+  font-size: .75rem;
+}
+body[data-theme="alternative"] .btn-secondary:hover {
+  color: var(--accent2);
+  border-color: var(--accent2);
+}
+
+/* ── Tableau classement — style données brutes ───────────────── */
+body[data-theme="alternative"] .ranking-table {
+  font-family: 'Courier New', monospace;
+  font-size: .8rem;
+}
+body[data-theme="alternative"] .ranking-table th {
+  background: transparent;
+  color: var(--accent2);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-size: .65rem;
+  border-bottom: 1px solid var(--border);
+  padding: .5rem .6rem;
+}
+body[data-theme="alternative"] .ranking-table td {
+  padding: .5rem .6rem;
+  border-bottom: 1px solid rgba(120,80,255,.08);
+}
+body[data-theme="alternative"] .ranking-table tr:hover td {
+  background: rgba(120,80,255,.05);
+}
+body[data-theme="alternative"] .pts-cell {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+/* ── Scores et pronostics ────────────────────────────────────── */
+body[data-theme="alternative"] .score-display {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--accent2);
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  min-width: 2.5rem;
+  text-align: center;
+}
+body[data-theme="alternative"] .real-score {
+  background: rgba(120,80,255,.08);
+  border: 1px solid var(--accent);
+  border-radius: 0;
+  color: var(--accent);
+  font-family: 'Courier New', monospace;
+}
+
+/* ── Badges journée ──────────────────────────────────────────── */
+body[data-theme="alternative"] .badge-ouvert {
+  background: transparent;
+  border: 1px solid var(--green);
+  color: var(--green);
+  border-radius: 0;
+  font-family: 'Courier New', monospace;
+  font-size: .65rem;
+  letter-spacing: .1em;
+}
+body[data-theme="alternative"] .badge-lock {
+  background: transparent;
+  border: 1px solid #ff5050;
+  color: #ff5050;
+  border-radius: 0;
+  font-family: 'Courier New', monospace;
+  font-size: .65rem;
+}
+body[data-theme="alternative"] .badge-bb { background: transparent; border: 1px solid #9b59b6; color: #9b59b6; border-radius:0; }
+body[data-theme="alternative"] .badge-pp { background: transparent; border: 1px solid #e8c45a; color: #e8c45a; border-radius:0; }
+
+/* ── Estimation card ─────────────────────────────────────────── */
+body[data-theme="alternative"] .estimation-card {
+  background: rgba(80,200,255,.04);
+  border: 1px solid rgba(80,200,255,.2);
+  border-radius: 0;
+}
+
+/* ── Chips pronostics ────────────────────────────────────────── */
+body[data-theme="alternative"] .prono-chip {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  font-family: 'Courier New', monospace;
+  font-size: .72rem;
+}
+
+/* ── Chat ────────────────────────────────────────────────────── */
+body[data-theme="alternative"] #chat-fab {
+  background: transparent;
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  border-radius: 0;
+  font-size: 1.1rem;
+  box-shadow: 0 0 20px rgba(120,80,255,.3);
+}
+body[data-theme="alternative"] .chat-panel {
+  background: rgba(10,10,15,.97);
+  backdrop-filter: blur(20px);
+  border-left: 1px solid var(--border);
+  font-family: 'Courier New', monospace;
+}
+body[data-theme="alternative"] .chat-panel-header {
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  color: var(--accent2);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  font-size: .8rem;
+}
+body[data-theme="alternative"] .chat-bubble {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 0;
+}
+body[data-theme="alternative"] .chat-msg.mine .chat-bubble {
+  background: rgba(120,80,255,.1);
+  border-color: var(--accent);
+}
+
+/* ── Inputs ──────────────────────────────────────────────────── */
+body[data-theme="alternative"] input[type="number"],
+body[data-theme="alternative"] input[type="text"],
+body[data-theme="alternative"] select,
+body[data-theme="alternative"] .admin-in {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--text);
+  font-family: 'Courier New', monospace;
+}
+body[data-theme="alternative"] input:focus,
+body[data-theme="alternative"] select:focus,
+body[data-theme="alternative"] .admin-in:focus {
+  border-color: var(--accent2);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(80,200,255,.15);
+}
+
+/* ── Login ───────────────────────────────────────────────────── */
+body[data-theme="alternative"] .login-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0;
+}
+body[data-theme="alternative"] .login-title {
+  font-family: 'Courier New', monospace;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .2em;
+}
+
+/* ── Rank numbers spéciaux ───────────────────────────────────── */
+body[data-theme="alternative"] .rank-num {
+  font-family: 'Courier New', monospace;
+  color: var(--accent2);
+  font-size: .75rem;
+}
+body[data-theme="alternative"] .rank-1 td:first-child::before { content: "01. "; color: var(--accent); }
