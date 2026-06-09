@@ -1624,6 +1624,61 @@ async def telegram_webhook(request: Request):
         print(f"Webhook error: {e}")
     return JSONResponse({"ok": True})
 
+@app.get("/admin/users-notif", response_class=HTMLResponse)
+async def admin_users_notif(request: Request):
+    """Affiche la config notifications de tous les joueurs."""
+    require_admin(request)
+    conn = get_db()
+    rows = qall(conn, """
+        SELECT u.username, u.id,
+               un.telegram_chat_id, un.email,
+               un.notify_24h, un.notify_2h
+        FROM users u
+        LEFT JOIN user_notifications un ON un.user_id=u.id
+        WHERE u.is_admin=0
+        ORDER BY u.username
+    """)
+    release_db(conn)
+    season = get_active_season()
+    user = get_current_user(request)
+    html = """
+    <style>
+      table { width:100%; border-collapse:collapse; font-size:.88rem; }
+      th { background:var(--surface2); padding:.6rem .8rem; text-align:left; color:var(--muted); font-size:.75rem; text-transform:uppercase; border-bottom:2px solid var(--border); }
+      td { padding:.6rem .8rem; border-bottom:1px solid var(--border); }
+      .ok { color:var(--green); } .ko { color:#e74c3c; } .na { color:var(--muted); }
+    </style>
+    <div class="container">
+      <h1>🔔 Config Notifications</h1>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <table>
+          <thead><tr>
+            <th>Joueur</th>
+            <th>Telegram Chat ID</th>
+            <th>Email</th>
+            <th>24h</th>
+            <th>2h</th>
+          </tr></thead>
+          <tbody>
+    """
+    for r in rows:
+        tg = f'<span class="ok">✓ {r["telegram_chat_id"]}</span>' if r["telegram_chat_id"] else '<span class="ko">✗ Non configuré</span>'
+        em = f'<span class="ok">✓ {r["email"]}</span>' if r["email"] else '<span class="na">—</span>'
+        n24 = '<span class="ok">✓</span>' if r["notify_24h"] else '<span class="ko">✗</span>'
+        n2  = '<span class="ok">✓</span>' if r["notify_2h"] else '<span class="ko">✗</span>'
+        html += f"<tr><td><strong>{r['username']}</strong></td><td>{tg}</td><td>{em}</td><td>{n24}</td><td>{n2}</td></tr>"
+    html += "</tbody></table></div></div>"
+    from fastapi.responses import HTMLResponse as HR
+    return HR(f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <title>Config Notifications</title></head>
+    <body data-theme="{user['theme'] if user and user.get('theme') else 'ligue1'}">
+    <nav><a class="nav-brand" href="/">🏆 PRONOS ENTE</a>
+    <div class="nav-links"><a href="/admin">⚙ Admin</a></div></nav>
+    {html}</body></html>""")
+
+
 @app.get("/admin/telegram-set-webhook")
 async def telegram_set_webhook(request: Request):
     """Configure le webhook Telegram vers ce serveur."""
@@ -1640,8 +1695,11 @@ async def telegram_set_webhook(request: Request):
         with urllib.request.urlopen(req, timeout=10) as resp:
             result = json.loads(resp.read())
         return JSONResponse({"ok": True, "webhook_url": webhook_url, "result": result})
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        return JSONResponse({"error": f"HTTP {e.code}", "detail": body, "webhook_url": webhook_url})
     except Exception as e:
-        return JSONResponse({"error": str(e)})
+        return JSONResponse({"error": str(e), "webhook_url": webhook_url})
 
 @app.post("/profil/save-notifications")
 async def save_notifications(request: Request,
