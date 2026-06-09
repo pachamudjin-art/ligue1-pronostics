@@ -52,19 +52,64 @@
     </form>
   </div>
 
-  <!-- Notifications Push -->
+  <!-- Notifications -->
   <div class="card" style="margin-bottom:1.2rem;">
-    <h2 style="margin-bottom:.75rem;">🔔 Notifications</h2>
-    <p style="font-size:.85rem; color:var(--muted); margin-bottom:.85rem;">
-      Recevez une notification 24h et 2h avant le début de chaque journée.
+    <h2 style="margin-bottom:.75rem;">🔔 Notifications de rappel</h2>
+    <p style="font-size:.85rem; color:var(--muted); margin-bottom:1rem;">
+      Recevez un rappel avant le début de chaque journée via Telegram ou Email.
     </p>
-    <button id="notif-toggle-btn" class="btn btn-secondary"
-            onclick="togglePushNotifications()" style="opacity:.6;">
-      🔕 Notifs OFF
-    </button>
-    <p style="font-size:.75rem; color:var(--muted); margin-top:.5rem;">
-      Vous pouvez désactiver à tout moment en recliquant.
-    </p>
+    {% if request.query_params.get('notif_saved') %}
+    <div style="background:rgba(46,160,67,.15); border:1px solid rgba(46,160,67,.3); color:#2ea043;
+                border-radius:7px; padding:.5rem .85rem; font-size:.85rem; margin-bottom:.85rem;">
+      ✓ Préférences de notification sauvegardées !
+    </div>
+    {% endif %}
+    <form method="post" action="/profil/save-notifications">
+      <!-- Telegram -->
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:.85rem; margin-bottom:.75rem;">
+        <div style="display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem;">
+          <span style="font-size:1.1rem;">✈️</span>
+          <strong style="font-size:.9rem;">Telegram</strong>
+          <span style="font-size:.75rem; color:var(--green); margin-left:auto;">Recommandé</span>
+        </div>
+        <p style="font-size:.78rem; color:var(--muted); margin-bottom:.5rem;">
+          1. Ouvrez Telegram et cherchez <strong>@ENTEPronos_bot</strong><br>
+          2. Envoyez <code>/start</code> au bot<br>
+          3. Le bot vous donnera votre Chat ID — collez-le ici
+        </p>
+        <input type="text" name="telegram_chat_id" class="admin-in"
+               value="{{ notif_prefs.telegram_chat_id if notif_prefs and notif_prefs.telegram_chat_id else '' }}"
+               placeholder="Ex: 123456789" style="width:100%; margin-bottom:.4rem;">
+      </div>
+
+      <!-- Email -->
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:.85rem; margin-bottom:.75rem;">
+        <div style="display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem;">
+          <span style="font-size:1.1rem;">📧</span>
+          <strong style="font-size:.9rem;">Email</strong>
+          <span style="font-size:.75rem; color:var(--muted); margin-left:auto;">Fallback si pas Telegram</span>
+        </div>
+        <input type="email" name="email" class="admin-in"
+               value="{{ notif_prefs.email if notif_prefs and notif_prefs.email else '' }}"
+               placeholder="votre@email.com" style="width:100%;">
+      </div>
+
+      <!-- Horaires -->
+      <div style="display:flex; gap:1rem; margin-bottom:.85rem;">
+        <label style="display:flex; align-items:center; gap:.4rem; font-size:.88rem; cursor:pointer;">
+          <input type="checkbox" name="notify_24h" value="1"
+                 {% if not notif_prefs or notif_prefs.notify_24h %}checked{% endif %}>
+          Rappel 24h avant
+        </label>
+        <label style="display:flex; align-items:center; gap:.4rem; font-size:.88rem; cursor:pointer;">
+          <input type="checkbox" name="notify_2h" value="1"
+                 {% if not notif_prefs or notif_prefs.notify_2h %}checked{% endif %}>
+          Rappel 2h avant
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-sm">Sauvegarder</button>
+    </form>
   </div>
 
   <!-- Changement de mot de passe -->
