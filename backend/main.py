@@ -1671,65 +1671,70 @@ async def push_unsubscribe(request: Request):
 async def run_cron_manually(request: Request):
     """Déclenche le cron manuellement depuis le navigateur."""
     require_admin(request)
-    # Simuler l'appel cron sans vérification du secret
-    from datetime import datetime, timezone
     conn = get_db()
-    now = datetime.now(timezone.utc)
-    sent = []
-    upcoming = qall(conn, """
-        SELECT md.id as matchday_id, md.number, md.label, md.season_id,
-               MIN(m.kickoff_time) as first_kickoff
-        FROM matchdays md
-        JOIN matches m ON m.matchday_id=md.id
-        JOIN seasons s ON s.id=md.season_id
-        WHERE s.is_active=1 AND m.kickoff_time > to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS')
-        GROUP BY md.id, md.number, md.label, md.season_id
-        ORDER BY first_kickoff LIMIT 3
-    """)
-    subscriptions = qall(conn, "SELECT * FROM push_subscriptions")
-    debug = []
-    for md in upcoming:
-        try:
-            ko = datetime.fromisoformat(md["first_kickoff"].replace(" ", "T") + "+00:00")
-            diff_hours = (ko - now).total_seconds() / 3600
-        except:
-            continue
-        label = md["label"] or f"J{md['number']}"
-        debug.append({"matchday": label, "diff_hours": round(diff_hours,2)})
-        for notif_type, hours_before, window in [("24h", 24, 2), ("2h", 2, 1.5)]:
-            if hours_before - window < diff_hours <= hours_before:
-                already = qone(conn, "SELECT id FROM notification_log WHERE matchday_id=%s AND type=%s",
-                               (md["matchday_id"], notif_type))
-                if already:
-                    sent.append({"matchday": label, "type": notif_type, "status": "déjà envoyé"})
-                    continue
-                matches_count = qone(conn, "SELECT COUNT(*) as cnt FROM matches WHERE matchday_id=%s", (md["matchday_id"],))
-                nb_matches = matches_count["cnt"] if matches_count else 0
-                title = f"⚽ {label} dans {hours_before}h !"
-                body = f"Début de la {label} dans {hours_before} heure{'s' if hours_before > 1 else ''}, fais tes pronos !"
-                ok_count = 0
-                for sub in subscriptions:
-                    pronos_count = qone(conn, """
-                        SELECT COUNT(*) as cnt FROM pronostics p
-                        JOIN matches m ON m.id=p.match_id
-                        WHERE p.user_id=%s AND m.matchday_id=%s
-                    """, (sub["user_id"], md["matchday_id"]))
-                    nb_pronos = pronos_count["cnt"] if pronos_count else 0
-                    if nb_pronos >= nb_matches:
+    try:
+        now = datetime.now(timezone.utc)
+        sent = []
+        upcoming = qall(conn, """
+            SELECT md.id as matchday_id, md.number, md.label, md.season_id,
+                   MIN(m.kickoff_time) as first_kickoff
+            FROM matchdays md
+            JOIN matches m ON m.matchday_id=md.id
+            JOIN seasons s ON s.id=md.season_id
+            WHERE s.is_active=1 AND m.kickoff_time > to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS')
+            GROUP BY md.id, md.number, md.label, md.season_id
+            ORDER BY first_kickoff LIMIT 3
+        """)
+        notif_users = qall(conn, """
+            SELECT un.*, u.username FROM user_notifications un
+            JOIN users u ON u.id=un.user_id
+        """)
+        debug = []
+        for md in upcoming:
+            try:
+                ko = datetime.fromisoformat(md["first_kickoff"].replace(" ", "T") + "+00:00")
+                diff_hours = (ko - now).total_seconds() / 3600
+            except:
+                continue
+            label = md["label"] or f"J{md['number']}"
+            debug.append({"matchday": label, "diff_hours": round(diff_hours, 2)})
+            for notif_type, hours_before, window in [("24h", 24, 2), ("2h", 2, 1.5)]:
+                if hours_before - window < diff_hours <= hours_before:
+                    already = qone(conn, "SELECT id FROM notification_log WHERE matchday_id=%s AND type=%s",
+                                   (md["matchday_id"], notif_type))
+                    if already:
+                        sent.append({"matchday": label, "type": notif_type, "status": "deja envoye"})
                         continue
-                    tg_msg = f"<b>{title}</b>\n{body_text}"
-                    if nu["telegram_chat_id"]:
-                        if send_telegram(nu["telegram_chat_id"], tg_msg):
-                            ok_count += 1
-                    elif nu["email"]:
-                        if send_reminder_email(nu["email"], title, body_text):
-                            ok_count += 1
-                q(conn, "INSERT INTO notification_log (matchday_id, type) VALUES (%s,%s) ON CONFLICT DO NOTHING",
-                  (md["matchday_id"], notif_type))
-                conn.commit()
-                sent.append({"matchday": label, "type": notif_type, "sent": ok_count})
-    release_db(conn)
-    return JSONResponse({"ok": True, "now_utc": now.isoformat(), "debug": debug, "sent": sent, "subscriptions": len(subscriptions)})
+                    nb_matches_r = qone(conn, "SELECT COUNT(*) as cnt FROM matches WHERE matchday_id=%s", (md["matchday_id"],))
+                    nb_matches = nb_matches_r["cnt"] if nb_matches_r else 0
+                    title = f"⚽ {label} dans {hours_before}h !"
+                    body_txt = f"Debut de la {label} dans {hours_before} heure{'s' if hours_before > 1 else ''}, fais tes pronos ! https://l1pronos.up.railway.app"
+                    ok_count = 0
+                    for nu in notif_users:
+                        notify_flag = "notify_24h" if notif_type == "24h" else "notify_2h"
+                        if not nu.get(notify_flag):
+                            continue
+                        pc = qone(conn, """
+                            SELECT COUNT(*) as cnt FROM pronostics p
+                            JOIN matches m ON m.id=p.match_id
+                            WHERE p.user_id=%s AND m.matchday_id=%s
+                        """, (nu["user_id"], md["matchday_id"]))
+                        if pc and pc["cnt"] >= nb_matches:
+                            continue
+                        if nu.get("telegram_chat_id"):
+                            tg_msg = "<b>" + title + "</b>\n" + body_txt
+                            if send_telegram(nu["telegram_chat_id"], tg_msg):
+                                ok_count += 1
+                        elif nu.get("email"):
+                            if send_reminder_email(nu["email"], title, body_txt):
+                                ok_count += 1
+                    q(conn, "INSERT INTO notification_log (matchday_id, type) VALUES (%s,%s) ON CONFLICT DO NOTHING",
+                      (md["matchday_id"], notif_type))
+                    conn.commit()
+                    sent.append({"matchday": label, "type": notif_type, "sent": ok_count})
+    finally:
+        release_db(conn)
+    return JSONResponse({"ok": True, "now_utc": now.isoformat(), "debug": debug, "sent": sent})
 
 @app.get("/admin/reset-notif-log")
 async def reset_notif_log(request: Request):
