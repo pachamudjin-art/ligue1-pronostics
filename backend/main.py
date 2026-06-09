@@ -1523,22 +1523,14 @@ async def admin_debug(request: Request):
 
 VAPID_PUBLIC_KEY  = os.environ.get("VAPID_PUBLIC_KEY",  "BINHFCzaBJaUu7IC6X5TP2hVJZAwExk0CSgnoHMmwY2kdqd_3eLl9_Ug96ww656cWrxW3uOVTYHjDmSMCnwRAE0")
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "g4lZjEZoksbqJhEQ81uN2TJuajDHPNPZcLtkZuNchWA")
-VAPID_CLAIMS      = {"sub": "mailto:pronos.ente.va@gmail.com"}
-
 def send_push_notification(endpoint: str, p256dh: str, auth: str, title: str, body: str) -> bool:
-    try:
-        from pywebpush import webpush, WebPushException
-        import json
-        webpush(
-            subscription_info={"endpoint": endpoint, "keys": {"p256dh": p256dh, "auth": auth}},
-            data=json.dumps({"title": title, "body": body}),
-            vapid_private_key=VAPID_PRIVATE_KEY,
-            vapid_claims=VAPID_CLAIMS,
-        )
-        return True
-    except Exception as e:
-        print(f"Push error: {e}")
-        return False
+    from webpush import send_web_push
+    return send_web_push(
+        endpoint=endpoint, p256dh=p256dh, auth=auth,
+        title=title, body=body,
+        vapid_private_key=VAPID_PRIVATE_KEY,
+        vapid_public_key=VAPID_PUBLIC_KEY,
+    )
 
 @app.get("/push/vapid-public-key")
 async def get_vapid_public_key():
