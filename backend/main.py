@@ -1589,6 +1589,60 @@ async def telegram_updates(request: Request):
     except Exception as e:
         return JSONResponse({"error": str(e)})
 
+@app.post("/telegram/webhook")
+async def telegram_webhook(request: Request):
+    """Webhook Telegram — répond au /start avec le chat_id."""
+    import json, urllib.request
+    try:
+        body = await request.json()
+        message = body.get("message", {})
+        text = message.get("text", "")
+        chat = message.get("chat", {})
+        chat_id = chat.get("id")
+        if not chat_id:
+            return JSONResponse({"ok": True})
+        if text.strip() == "/start":
+            reply = (
+                f"👋 Bienvenue sur ENTE Pronos !\n\n"
+                f"Votre Chat ID est :\n"
+                f"<code>{chat_id}</code>\n\n"
+                f"Copiez ce numéro et collez-le dans votre profil sur l'appli "
+                f"(section Notifications) pour activer les rappels."
+            )
+            data = json.dumps({
+                "chat_id": chat_id,
+                "text": reply,
+                "parse_mode": "HTML"
+            }).encode()
+            req = urllib.request.Request(
+                f"{TELEGRAM_API}/sendMessage",
+                data=data,
+                headers={"Content-Type": "application/json"}
+            )
+            urllib.request.urlopen(req, timeout=10)
+    except Exception as e:
+        print(f"Webhook error: {e}")
+    return JSONResponse({"ok": True})
+
+@app.get("/admin/telegram-set-webhook")
+async def telegram_set_webhook(request: Request):
+    """Configure le webhook Telegram vers ce serveur."""
+    require_admin(request)
+    import urllib.request, json
+    webhook_url = str(request.base_url) + "telegram/webhook"
+    data = json.dumps({"url": webhook_url}).encode()
+    req = urllib.request.Request(
+        f"{TELEGRAM_API}/setWebhook",
+        data=data,
+        headers={"Content-Type": "application/json"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read())
+        return JSONResponse({"ok": True, "webhook_url": webhook_url, "result": result})
+    except Exception as e:
+        return JSONResponse({"error": str(e)})
+
 @app.post("/profil/save-notifications")
 async def save_notifications(request: Request,
                               email: str = Form(""),
