@@ -1565,6 +1565,17 @@ def send_reminder_email(to_email: str, subject: str, body: str) -> bool:
         print(f"Email error: {e}")
         return False
 
+@app.get("/admin/test-email")
+async def test_email(request: Request, to: str = ""):
+    """Teste l'envoi d'un email de rappel (diagnostic SMTP)."""
+    require_admin(request)
+    if not to:
+        return JSONResponse({"ok": False, "error": "Paramètre 'to' manquant. Utilisez /admin/test-email?to=adresse@exemple.com"})
+    if not SMTP_PASS:
+        return JSONResponse({"ok": False, "error": "SMTP_PASS n'est pas défini dans les variables d'environnement.", "smtp_from": SMTP_FROM})
+    result = send_reminder_email(to, "Test email - Ligue 1 Pronostics", "Ceci est un email de test envoyé depuis /admin/test-email. Si vous le recevez, la config SMTP fonctionne.")
+    return JSONResponse({"ok": result, "to": to, "smtp_from": SMTP_FROM, "smtp_pass_defined": bool(SMTP_PASS)})
+
 @app.get("/telegram/webhook-info")
 async def telegram_info(request: Request):
     """Vérifie le statut du bot Telegram."""
