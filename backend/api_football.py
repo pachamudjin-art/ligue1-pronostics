@@ -113,9 +113,10 @@ def fetch_fixtures(season_year: int, matchday: int = None, competition_code: str
         else: norm_status = "scheduled"
 
         score = match.get("score", {})
+        regular_time = score.get("regularTime", {})
         full_time = score.get("fullTime", {})
-        home_score = full_time.get("home")
-        away_score = full_time.get("away")
+        home_score = regular_time.get("home") if regular_time.get("home") is not None else full_time.get("home")
+        away_score = regular_time.get("away") if regular_time.get("away") is not None else full_time.get("away")
 
         # Nom des équipes : shortName ou name
         home = match["homeTeam"]
