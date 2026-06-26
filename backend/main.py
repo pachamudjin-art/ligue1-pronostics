@@ -1567,14 +1567,26 @@ def send_reminder_email(to_email: str, subject: str, body: str) -> bool:
 
 @app.get("/admin/test-email")
 async def test_email(request: Request, to: str = ""):
-    """Teste l'envoi d'un email de rappel (diagnostic SMTP)."""
+    """Teste l'envoi d'un email de rappel (diagnostic SMTP), avec détail de l'erreur le cas échéant."""
     require_admin(request)
     if not to:
         return JSONResponse({"ok": False, "error": "Paramètre 'to' manquant. Utilisez /admin/test-email?to=adresse@exemple.com"})
     if not SMTP_PASS:
         return JSONResponse({"ok": False, "error": "SMTP_PASS n'est pas défini dans les variables d'environnement.", "smtp_from": SMTP_FROM})
-    result = send_reminder_email(to, "Test email - Ligue 1 Pronostics", "Ceci est un email de test envoyé depuis /admin/test-email. Si vous le recevez, la config SMTP fonctionne.")
-    return JSONResponse({"ok": result, "to": to, "smtp_from": SMTP_FROM, "smtp_pass_defined": bool(SMTP_PASS)})
+    try:
+        from email.mime.text import MIMEText
+        import smtplib
+        msg = MIMEText("Ceci est un email de test envoyé depuis /admin/test-email. Si vous le recevez, la config SMTP fonctionne.", "plain", "utf-8")
+        msg["From"] = SMTP_FROM
+        msg["To"] = to
+        msg["Subject"] = "Test email - Ligue 1 Pronostics"
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+            server.ehlo(); server.starttls(); server.ehlo()
+            server.login(SMTP_FROM, SMTP_PASS)
+            server.sendmail(SMTP_FROM, to, msg.as_string())
+        return JSONResponse({"ok": True, "to": to, "smtp_from": SMTP_FROM})
+    except Exception as e:
+        return JSONResponse({"ok": False, "to": to, "smtp_from": SMTP_FROM, "error_type": type(e).__name__, "error": str(e)})
 
 @app.get("/telegram/webhook-info")
 async def telegram_info(request: Request):
