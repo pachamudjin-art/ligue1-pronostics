@@ -9,6 +9,8 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 import hashlib
 import os
+import socket
+import smtplib
 from datetime import datetime, timezone
 
 from database import (get_db, release_db, init_db, seed_users, seed_active_season,
@@ -18,6 +20,28 @@ from scoring import (compute_points, compute_estimate_points,
                      compute_matchday_stats, compute_general_ranking)
 from api_football import import_matchday_to_db, update_live_scores, fetch_fixtures, fetch_teams
 from scoring import compute_podium_points
+
+
+class SMTP_IPv4(smtplib.SMTP):
+    """SMTP forcé en IPv4 — Railway n'a pas de connectivité IPv6 sortante,
+    et smtp.gmail.com publie aussi une adresse IPv6, ce qui provoque
+    'Network is unreachable' si on laisse le choix par défaut."""
+    def _get_socket(self, host, port, timeout):
+        addrs = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+        last_err = None
+        for family, socktype, proto, canonname, sockaddr in addrs:
+            sock = None
+            try:
+                sock = socket.socket(family, socktype, proto)
+                if timeout is not None:
+                    sock.settimeout(timeout)
+                sock.connect(sockaddr)
+                return sock
+            except OSError as e:
+                last_err = e
+                if sock is not None:
+                    sock.close()
+        raise OSError(f"Impossible de se connecter en IPv4 à {host}:{port} ({last_err})")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
@@ -1556,7 +1580,7 @@ def send_reminder_email(to_email: str, subject: str, body: str) -> bool:
         msg["From"] = SMTP_FROM
         msg["To"] = to_email
         msg["Subject"] = subject
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+        with SMTP_IPv4("smtp.gmail.com", 587, timeout=15) as server:
             server.ehlo(); server.starttls(); server.ehlo()
             server.login(SMTP_FROM, SMTP_PASS)
             server.sendmail(SMTP_FROM, to_email, msg.as_string())
@@ -1580,7 +1604,7 @@ async def test_email(request: Request, to: str = ""):
         msg["From"] = SMTP_FROM
         msg["To"] = to
         msg["Subject"] = "Test email - Ligue 1 Pronostics"
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+        with SMTP_IPv4("smtp.gmail.com", 587, timeout=15) as server:
             server.ehlo(); server.starttls(); server.ehlo()
             server.login(SMTP_FROM, SMTP_PASS)
             server.sendmail(SMTP_FROM, to, msg.as_string())
@@ -2034,7 +2058,7 @@ def send_csv_backup(season_name: str, matchday_label: str, csv_content: str):
         filename = f"pronos_{season_name.replace(' ','_')}_{matchday_label.replace(' ','_')}.csv"
         part.add_header("Content-Disposition", f"attachment; filename={filename}")
         msg.attach(part)
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+        with SMTP_IPv4("smtp.gmail.com", 587, timeout=15) as server:
             server.ehlo()
             server.starttls()
             server.ehlo()
