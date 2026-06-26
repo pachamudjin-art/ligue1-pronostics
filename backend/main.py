@@ -1568,6 +1568,7 @@ def send_email_resend(to_email: str, subject: str, body: str):
             headers={
                 "Authorization": f"Bearer {RESEND_API_KEY}",
                 "Content-Type": "application/json",
+                "User-Agent": "ligue1-pronostics/1.0",
             },
         )
         with urllib.request.urlopen(req, timeout=15) as resp:
@@ -2045,6 +2046,7 @@ def send_csv_backup(season_name: str, matchday_label: str, csv_content: str):
             headers={
                 "Authorization": f"Bearer {RESEND_API_KEY}",
                 "Content-Type": "application/json",
+                "User-Agent": "ligue1-pronostics/1.0",
             },
         )
         with urllib.request.urlopen(req, timeout=15) as resp:
