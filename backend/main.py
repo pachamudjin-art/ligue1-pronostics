@@ -9,8 +9,6 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 import hashlib
 import os
-import socket
-import smtplib
 from datetime import datetime, timezone
 
 from database import (get_db, release_db, init_db, seed_users, seed_active_season,
@@ -20,28 +18,6 @@ from scoring import (compute_points, compute_estimate_points,
                      compute_matchday_stats, compute_general_ranking)
 from api_football import import_matchday_to_db, update_live_scores, fetch_fixtures, fetch_teams
 from scoring import compute_podium_points
-
-
-class SMTP_IPv4(smtplib.SMTP):
-    """SMTP forcé en IPv4 — Railway n'a pas de connectivité IPv6 sortante,
-    et smtp.gmail.com publie aussi une adresse IPv6, ce qui provoque
-    'Network is unreachable' si on laisse le choix par défaut."""
-    def _get_socket(self, host, port, timeout):
-        addrs = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
-        last_err = None
-        for family, socktype, proto, canonname, sockaddr in addrs:
-            sock = None
-            try:
-                sock = socket.socket(family, socktype, proto)
-                if timeout is not None:
-                    sock.settimeout(timeout)
-                sock.connect(sockaddr)
-                return sock
-            except OSError as e:
-                last_err = e
-                if sock is not None:
-                    sock.close()
-        raise OSError(f"Impossible de se connecter en IPv4 à {host}:{port} ({last_err})")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
@@ -1569,48 +1545,58 @@ def send_telegram(chat_id: str, text: str) -> bool:
         print(f"Telegram error: {e}")
         return False
 
-def send_reminder_email(to_email: str, subject: str, body: str) -> bool:
-    """Envoie un email de rappel."""
-    if not SMTP_PASS or not to_email:
-        return False
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
+
+def send_email_resend(to_email: str, subject: str, body: str):
+    """Envoie un email via l'API HTTPS de Resend (le SMTP sortant est bloqué sur Railway hors plan Pro).
+    Retourne (ok: bool, detail: str)."""
+    if not RESEND_API_KEY or not to_email:
+        return False, "RESEND_API_KEY non défini ou destinataire manquant."
     try:
-        from email.mime.text import MIMEText
-        import smtplib
-        msg = MIMEText(body, "plain", "utf-8")
-        msg["From"] = SMTP_FROM
-        msg["To"] = to_email
-        msg["Subject"] = subject
-        with SMTP_IPv4("smtp.gmail.com", 587, timeout=15) as server:
-            server.ehlo(); server.starttls(); server.ehlo()
-            server.login(SMTP_FROM, SMTP_PASS)
-            server.sendmail(SMTP_FROM, to_email, msg.as_string())
-        return True
+        import urllib.request, urllib.error, json
+        payload = json.dumps({
+            "from": RESEND_FROM,
+            "to": [to_email],
+            "subject": subject,
+            "text": body,
+        }).encode()
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=payload,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            resp.read()
+        return True, "ok"
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")
+        print(f"Resend HTTP error {e.code}: {detail}")
+        return False, f"HTTP {e.code}: {detail[:300]}"
     except Exception as e:
-        print(f"Email error: {e}")
-        return False
+        print(f"Resend error: {e}")
+        return False, str(e)
+
+def send_reminder_email(to_email: str, subject: str, body: str) -> bool:
+    """Envoie un email de rappel (via Resend)."""
+    ok, _ = send_email_resend(to_email, subject, body)
+    return ok
 
 @app.get("/admin/test-email")
 async def test_email(request: Request, to: str = ""):
-    """Teste l'envoi d'un email de rappel (diagnostic SMTP), avec détail de l'erreur le cas échéant."""
+    """Teste l'envoi d'un email de rappel via Resend, avec détail de l'erreur le cas échéant."""
     require_admin(request)
     if not to:
         return JSONResponse({"ok": False, "error": "Paramètre 'to' manquant. Utilisez /admin/test-email?to=adresse@exemple.com"})
-    if not SMTP_PASS:
-        return JSONResponse({"ok": False, "error": "SMTP_PASS n'est pas défini dans les variables d'environnement.", "smtp_from": SMTP_FROM})
-    try:
-        from email.mime.text import MIMEText
-        import smtplib
-        msg = MIMEText("Ceci est un email de test envoyé depuis /admin/test-email. Si vous le recevez, la config SMTP fonctionne.", "plain", "utf-8")
-        msg["From"] = SMTP_FROM
-        msg["To"] = to
-        msg["Subject"] = "Test email - Ligue 1 Pronostics"
-        with SMTP_IPv4("smtp.gmail.com", 587, timeout=15) as server:
-            server.ehlo(); server.starttls(); server.ehlo()
-            server.login(SMTP_FROM, SMTP_PASS)
-            server.sendmail(SMTP_FROM, to, msg.as_string())
-        return JSONResponse({"ok": True, "to": to, "smtp_from": SMTP_FROM})
-    except Exception as e:
-        return JSONResponse({"ok": False, "to": to, "smtp_from": SMTP_FROM, "error_type": type(e).__name__, "error": str(e)})
+    if not RESEND_API_KEY:
+        return JSONResponse({"ok": False, "error": "RESEND_API_KEY n'est pas défini dans les variables d'environnement."})
+    ok, detail = send_email_resend(to, "Test email - Ligue 1 Pronostics",
+        "Ceci est un email de test envoyé depuis /admin/test-email. Si vous le recevez, la config Resend fonctionne.")
+    return JSONResponse({"ok": ok, "to": to, "resend_from": RESEND_FROM, "detail": detail})
 
 @app.get("/telegram/webhook-info")
 async def telegram_info(request: Request):
@@ -2027,43 +2013,42 @@ async def cron_notify(request: Request):
 
 # ─── Export CSV & Mail ───────────────────────────────────────────────────────
 
-import smtplib
 import csv
 import io
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
+import base64
 
-SMTP_FROM = os.environ.get("SMTP_FROM", "pronos.ente.va@gmail.com")
-SMTP_TO   = os.environ.get("SMTP_TO",   "pronos.ente.va@gmail.com")
-SMTP_PASS = os.environ.get("SMTP_PASS", "")
+RESEND_TO = os.environ.get("RESEND_TO", "pronos.ente.va@gmail.com")
 
 def send_csv_backup(season_name: str, matchday_label: str, csv_content: str):
-    """Envoie le CSV par mail via Gmail SMTP."""
-    if not SMTP_PASS:
-        print("SMTP_PASS non défini, mail non envoyé.")
+    """Envoie le CSV par mail via l'API Resend, avec le CSV en pièce jointe."""
+    if not RESEND_API_KEY:
+        print("RESEND_API_KEY non défini, mail non envoyé.")
         return False
     try:
-        msg = MIMEMultipart()
-        msg["From"] = SMTP_FROM
-        msg["To"] = SMTP_TO
-        msg["Subject"] = f"[ENTE Pronos] Backup {season_name} — {matchday_label}"
-        body = f"Backup automatique des pronostics.\n\nSaison : {season_name}\nJournée : {matchday_label}"
-        msg.attach(MIMEText(body, "plain", "utf-8"))
-        # Pièce jointe CSV
-        part = MIMEBase("application", "octet-stream")
-        part.set_payload(csv_content.encode("utf-8"))
-        encoders.encode_base64(part)
+        import urllib.request, urllib.error, json
         filename = f"pronos_{season_name.replace(' ','_')}_{matchday_label.replace(' ','_')}.csv"
-        part.add_header("Content-Disposition", f"attachment; filename={filename}")
-        msg.attach(part)
-        with SMTP_IPv4("smtp.gmail.com", 587, timeout=15) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(SMTP_FROM, SMTP_PASS)
-            server.sendmail(SMTP_FROM, SMTP_TO, msg.as_string())
+        body = f"Backup automatique des pronostics.\n\nSaison : {season_name}\nJournée : {matchday_label}"
+        payload = json.dumps({
+            "from": RESEND_FROM,
+            "to": [RESEND_TO],
+            "subject": f"[ENTE Pronos] Backup {season_name} — {matchday_label}",
+            "text": body,
+            "attachments": [{
+                "filename": filename,
+                "content": base64.b64encode(csv_content.encode("utf-8")).decode("ascii"),
+            }],
+        }).encode()
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=payload,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            resp.read()
         print(f"Mail backup envoyé : {filename}")
         return True
     except Exception as e:
