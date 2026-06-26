@@ -284,6 +284,56 @@ async def admin_reset_password(request: Request, user_id: int = Form(...), new_p
 
 # ─── Home ────────────────────────────────────────────────────────────────────
 
+import statistics
+
+def get_current_matchday(season_id):
+    """Détermine la journée à afficher par défaut :
+    1) celle dont les dates (1er coup d'envoi → dernier) couvrent aujourd'hui
+    2) sinon la prochaine journée à venir
+    3) sinon la dernière journée déjà jouée
+
+    Pour le calcul des bornes d'une journée, on ignore les matchs isolés
+    reportés loin dans le temps (ex: un match de J1 rejoué un mois plus tard) :
+    on ne garde que les matchs proches de la date médiane de la journée
+    (± 4 jours), pour ne pas fausser la fenêtre "normale" de la journée.
+    """
+    conn = get_db()
+    matchdays = qall(conn, "SELECT * FROM matchdays WHERE season_id=%s ORDER BY number", (season_id,))
+    today = datetime.now(timezone.utc).date()
+    candidates = []
+    for md in matchdays:
+        matches = qall(conn, "SELECT kickoff_time FROM matches WHERE matchday_id=%s", (md["id"],))
+        if not matches:
+            continue
+        dates = [parse_kickoff(m["kickoff_time"]).date() for m in matches]
+        median_ordinal = statistics.median(d.toordinal() for d in dates)
+        median_date = datetime.fromordinal(int(median_ordinal)).date()
+        core_dates = [d for d in dates if abs((d - median_date).days) <= 4]
+        if not core_dates:
+            core_dates = dates
+        candidates.append((md, min(core_dates), max(core_dates)))
+    release_db(conn)
+
+    if not candidates:
+        return None
+
+    # 1) Journée en cours (aujourd'hui dans son intervalle "normal")
+    for md, start, end in candidates:
+        if start <= today <= end:
+            return md
+
+    # 2) Prochaine journée à venir (la plus proche)
+    upcoming = sorted([c for c in candidates if c[1] > today], key=lambda c: c[1])
+    if upcoming:
+        return upcoming[0][0]
+
+    # 3) Sinon, dernière journée déjà jouée
+    past = sorted([c for c in candidates if c[2] < today], key=lambda c: c[2], reverse=True)
+    if past:
+        return past[0][0]
+
+    return candidates[-1][0]
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     user = get_current_user(request)
@@ -291,15 +341,7 @@ async def home(request: Request):
     season = get_active_season()
     if not season:
         return templates.TemplateResponse("error.html", {"request": request, "message": "Aucune saison active."})
-    conn = get_db()
-    matchday = qone(conn, """
-        SELECT md.* FROM matchdays md
-        JOIN matches m ON m.matchday_id=md.id
-        WHERE md.season_id=%s ORDER BY md.number DESC LIMIT 1
-    """, (season["id"],))
-    if not matchday:
-        matchday = qone(conn, "SELECT * FROM matchdays WHERE season_id=%s ORDER BY number LIMIT 1", (season["id"],))
-    release_db(conn)
+    matchday = get_current_matchday(season["id"])
     if matchday:
         return RedirectResponse(f"/saison/{season['id']}/journee/{matchday['number']}", status_code=303)
     return templates.TemplateResponse("error.html", {"request": request, "message": "Aucune journée disponible."})
