@@ -873,7 +873,7 @@ async def admin_delete_match(request: Request, match_id: int = Form(...)):
 
 @app.post("/admin/import-api")
 async def admin_import_api(request: Request, matchday_number: int = Form(...),
-                           api_year: int = Form(None)):
+                           api_year: int = Form(None), stage: str = Form(None)):
     require_admin(request)
     season = get_active_season()
     conn = get_db()
@@ -883,7 +883,9 @@ async def admin_import_api(request: Request, matchday_number: int = Form(...),
         release_db(conn)
         return JSONResponse({"ok": False, "error": f"Journée {matchday_number} introuvable"})
     api_code = season.get("api_code", "FL1")
-    nb, errors = import_matchday_to_db(year_to_use, matchday_number, season["id"], matchday["id"], conn, competition_code=api_code)
+    stage_clean = stage.strip() if stage else None
+    nb, errors = import_matchday_to_db(year_to_use, matchday_number, season["id"], matchday["id"], conn,
+                                        competition_code=api_code, stage=stage_clean)
     release_db(conn)
     return JSONResponse({"ok": True, "imported": nb, "errors": errors})
 

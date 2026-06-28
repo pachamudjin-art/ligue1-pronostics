@@ -88,9 +88,13 @@ def _request(endpoint: str, params: dict = None) -> dict | None:
         return None
 
 
-def fetch_fixtures(season_year: int, matchday: int = None, competition_code: str = "FL1") -> list:
+def fetch_fixtures(season_year: int, matchday: int = None, competition_code: str = "FL1", stage: str = None) -> list:
     params = {"season": season_year}
-    if matchday is not None:
+    if stage:
+        # Phases à élimination directe (ROUND_OF_16, QUARTER_FINALS, SEMI_FINALS, FINAL, ...) :
+        # l'API ne renseigne PAS le champ "matchday" pour ces matchs, donc on filtre par "stage" à la place.
+        params["stage"] = stage
+    elif matchday is not None:
         params["matchday"] = matchday
 
     data = _request(f"competitions/{competition_code}/matches", params)
@@ -113,10 +117,9 @@ def fetch_fixtures(season_year: int, matchday: int = None, competition_code: str
         else: norm_status = "scheduled"
 
         score = match.get("score", {})
-        regular_time = score.get("regularTime", {})
         full_time = score.get("fullTime", {})
-        home_score = regular_time.get("home") if regular_time.get("home") is not None else full_time.get("home")
-        away_score = regular_time.get("away") if regular_time.get("away") is not None else full_time.get("away")
+        home_score = full_time.get("home")
+        away_score = full_time.get("away")
 
         # Nom des équipes : shortName ou name
         home = match["homeTeam"]
@@ -148,8 +151,8 @@ def fetch_teams(competition_code: str, season_year: int) -> list:
 
 def import_matchday_to_db(season_year: int, matchday_number: int,
                            season_id: int, matchday_id: int, conn,
-                           competition_code: str = "FL1") -> tuple[int, list]:
-    fixtures = fetch_fixtures(season_year, matchday_number, competition_code)
+                           competition_code: str = "FL1", stage: str = None) -> tuple[int, list]:
+    fixtures = fetch_fixtures(season_year, matchday_number, competition_code, stage=stage)
     if not fixtures:
         return 0, ["Aucun match récupéré depuis l'API."]
 
