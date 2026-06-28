@@ -59,12 +59,22 @@
   <div class="card" style="margin-bottom:1.2rem;">
     <h2 style="margin-bottom:.75rem;">Importer depuis API-Football</h2>
     <div style="display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
+      <select id="api_stage_select" class="admin-in" style="min-width:220px;">
+        <option value="">Phase de groupes (par numéro de journée)</option>
+        <option value="ROUND_OF_32">16èmes de finale (Round of 32)</option>
+        <option value="ROUND_OF_16">8èmes de finale (Round of 16)</option>
+        <option value="QUARTER_FINALS">Quarts de finale</option>
+        <option value="SEMI_FINALS">Demi-finales</option>
+        <option value="THIRD_PLACE">Match pour la 3e place</option>
+        <option value="FINAL">Finale</option>
+      </select>
       <button id="btn_import_api" class="btn btn-primary"
-              onclick="importFromApi({{ matchday.number }})">
+              onclick="importFromApi({{ matchday.number }}, document.getElementById('api_stage_select').value)">
         📥 Importer J{{ matchday.number }} depuis l'API
       </button>
       <span style="font-size:.8rem; color:var(--muted);">
-        Nécessite une clé API-Football (variable d'env. API_FOOTBALL_KEY)
+        Nécessite une clé API-Football (variable d'env. API_FOOTBALL_KEY).
+        Pour les phases à élimination directe, sélectionnez la bonne phase ci-dessus.
       </span>
     </div>
   </div>
