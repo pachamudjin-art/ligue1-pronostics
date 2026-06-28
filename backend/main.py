@@ -887,6 +887,8 @@ async def admin_import_api(request: Request, matchday_number: int = Form(...),
     nb, errors = import_matchday_to_db(year_to_use, matchday_number, season["id"], matchday["id"], conn,
                                         competition_code=api_code, stage=stage_clean)
     release_db(conn)
+    if nb == 0 and errors:
+        errors = [f"(saison utilisée: {year_to_use}, compétition: {api_code}, stage: {stage_clean or '—'}) " + e for e in errors]
     return JSONResponse({"ok": True, "imported": nb, "errors": errors})
 
 @app.post("/admin/import-saison-complete")
