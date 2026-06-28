@@ -107,7 +107,7 @@ function goToJournee(select, seasonId) {
 }
 
 // ── Admin : importer depuis l'API ─────────────────────────────
-async function importFromApi(matchdayNumber) {
+async function importFromApi(matchdayNumber, stage) {
   const btn = document.getElementById("btn_import_api");
   const origLabel = btn ? btn.textContent : "";
   if (btn) { btn.disabled = true; btn.textContent = "⏳ Import en cours…"; }
@@ -115,6 +115,7 @@ async function importFromApi(matchdayNumber) {
 
   const fd = new FormData();
   fd.append("matchday_number", matchdayNumber);
+  if (stage) fd.append("stage", stage);
 
   // Timeout explicite de 60 secondes
   const controller = new AbortController();
