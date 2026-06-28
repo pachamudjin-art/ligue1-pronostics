@@ -2238,6 +2238,48 @@ async def admin_fix_team_names(request: Request):
     return JSONResponse({"ok": True, "updated": total, "fixes": [f[1] for f in fixes]})
 
 
+@app.get("/admin/debug-fixtures")
+async def admin_debug_fixtures(request: Request, competition_code: str = "WC", year: int = 2026, stage: str = "", matchday: int = None):
+    """Interroge directement l'API football-data.org et retourne la réponse brute (sans filtre applicatif),
+    pour diagnostiquer un import qui ne ramène aucun match."""
+    require_admin(request)
+    import urllib.request, urllib.error, json as _json
+    api_key = os.environ.get("FOOTBALL_DATA_KEY", "")
+    if not api_key:
+        return JSONResponse({"ok": False, "error": "FOOTBALL_DATA_KEY absente"})
+    params = {"season": year}
+    if stage:
+        params["stage"] = stage
+    elif matchday is not None:
+        params["matchday"] = matchday
+    query = "?" + "&".join(f"{k}={v}" for k, v in params.items())
+    url = f"https://api.football-data.org/v4/competitions/{competition_code}/matches{query}"
+    req = urllib.request.Request(url)
+    req.add_header("X-Auth-Token", api_key)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = _json.loads(resp.read())
+        matches = data.get("matches", [])
+        stages_present = sorted(set(m.get("stage") for m in matches))
+        return JSONResponse({
+            "ok": True,
+            "url": url,
+            "nb_matches_renvoyes": len(matches),
+            "stages_presents_dans_la_reponse": stages_present,
+            "echantillon": [
+                {"id": m.get("id"), "stage": m.get("stage"), "matchday": m.get("matchday"),
+                 "status": m.get("status"), "utcDate": m.get("utcDate"),
+                 "home": (m.get("homeTeam") or {}).get("name"),
+                 "away": (m.get("awayTeam") or {}).get("name")}
+                for m in matches[:5]
+            ],
+        })
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        return JSONResponse({"ok": False, "url": url, "http_error": e.code, "body": body[:500]})
+    except Exception as e:
+        return JSONResponse({"ok": False, "url": url, "error": str(e)})
+
 @app.get("/admin/test-api")
 async def admin_test_api(request: Request):
     require_admin(request)
