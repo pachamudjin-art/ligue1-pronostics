@@ -276,10 +276,12 @@
             <div id="prono_form_{{ m.id }}" class="score-form" style="display:{% if my_p %}none{% else %}flex{% endif %};">
               <div class="score-input-wrap">
                 <input type="number" id="h_{{ m.id }}" class="score-in" min="0" max="20"
-                       value="{% if my_p %}{{ my_p.home_score }}{% endif %}" placeholder="0">
+                       value="{% if my_p %}{{ my_p.home_score }}{% endif %}" placeholder="0"
+                       oninput="onHomeScoreInput({{ m.id }})">
                 <span class="score-sep">–</span>
                 <input type="number" id="a_{{ m.id }}" class="score-in" min="0" max="20"
-                       value="{% if my_p %}{{ my_p.away_score }}{% endif %}" placeholder="0">
+                       value="{% if my_p %}{{ my_p.away_score }}{% endif %}" placeholder="0"
+                       oninput="onAwayScoreInput({{ m.id }})">
               </div>
               <button id="btn_{{ m.id }}" class="btn btn-primary btn-sm" onclick="submitProno({{ m.id }})">✓</button>
             </div>
