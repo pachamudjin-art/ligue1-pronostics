@@ -18,6 +18,22 @@ function toast(msg, type = "ok", duration = 3000) {
 }
 
 // ── Soumettre un pronostic ───────────────────────────────────
+// ── Saisie auto : 1 chiffre domicile → focus extérieur → 1 chiffre extérieur → enregistre ──
+function onHomeScoreInput(matchId) {
+  const h = document.getElementById(`h_${matchId}`);
+  if (h && /^[0-9]$/.test(h.value)) {
+    const a = document.getElementById(`a_${matchId}`);
+    if (a) a.focus();
+  }
+}
+
+async function onAwayScoreInput(matchId) {
+  const a = document.getElementById(`a_${matchId}`);
+  if (a && /^[0-9]$/.test(a.value)) {
+    await submitProno(matchId);
+  }
+}
+
 async function submitProno(matchId) {
   const h = document.getElementById(`h_${matchId}`)?.value;
   const a = document.getElementById(`a_${matchId}`)?.value;
