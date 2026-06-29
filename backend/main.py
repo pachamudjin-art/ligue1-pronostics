@@ -770,6 +770,20 @@ async def admin_page(request: Request):
         "all_users": [dict(u) for u in all_users],
     })
 
+@app.get("/admin/connexions", response_class=HTMLResponse)
+async def admin_connexions(request: Request):
+    admin = require_admin(request)
+    conn = get_db()
+    logs = qall(conn, """
+        SELECT l.logged_in_at, l.ip_address, u.username
+        FROM login_log l JOIN users u ON u.id=l.user_id
+        ORDER BY l.logged_in_at DESC LIMIT 500
+    """)
+    release_db(conn)
+    return templates.TemplateResponse("admin_connexions.html", {
+        "request": request, "user": admin, "logs": [dict(l) for l in logs],
+    })
+
 @app.post("/admin/season/set-active")
 async def admin_set_active_season(request: Request, season_id: int = Form(...)):
     require_admin(request)
@@ -1526,6 +1540,34 @@ async def admin_import_ods(request: Request):
 
 
 # ─── Debug ────────────────────────────────────────────────────────────────────
+
+@app.get("/admin/check-pronos")
+async def admin_check_pronos(request: Request, username: str = ""):
+    """Vérifie les pronostics enregistrés pour un utilisateur (preuve en cas de litige)."""
+    require_admin(request)
+    if not username:
+        return JSONResponse({"ok": False, "error": "Paramètre 'username' manquant. Utilisez /admin/check-pronos?username=pseudo"})
+    conn = get_db()
+    u = qone(conn, "SELECT id, username FROM users WHERE username=%s", (username,))
+    if not u:
+        release_db(conn)
+        return JSONResponse({"ok": False, "error": f"Utilisateur '{username}' introuvable"})
+    rows = qall(conn, """
+        SELECT p.match_id, p.home_score, p.away_score, p.created_at, p.updated_at,
+               m.home_team, m.away_team, md.number as matchday_number
+        FROM pronostics p
+        JOIN matches m ON m.id = p.match_id
+        JOIN matchdays md ON md.id = m.matchday_id
+        WHERE p.user_id = %s
+        ORDER BY p.created_at DESC LIMIT 100
+    """, (u["id"],))
+    release_db(conn)
+    return JSONResponse({
+        "ok": True,
+        "username": u["username"],
+        "nb_pronostics": len(rows),
+        "pronostics": [dict(r) for r in rows],
+    })
 
 @app.get("/admin/debug", response_class=HTMLResponse)
 async def admin_debug(request: Request):
