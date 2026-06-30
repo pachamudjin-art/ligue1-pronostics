@@ -182,6 +182,9 @@ def import_matchday_to_db(season_year: int, matchday_number: int,
 
 
 def update_live_scores(season_year: int, conn, competition_code: str = "FL1") -> int:
+    # Pas de filtre matchday/stage ici : on veut couvrir aussi bien la phase de groupes
+    # que les phases à élimination directe (où "matchday" est toujours null côté API),
+    # donc on récupère tous les matchs de la compétition/saison en une fois.
     fixtures = fetch_fixtures(season_year, competition_code=competition_code)
     from database import q, qone
     updated = 0
