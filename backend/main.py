@@ -2315,7 +2315,15 @@ async def admin_debug_fixtures(request: Request, competition_code: str = "WC", y
                 {"id": m.get("id"), "stage": m.get("stage"), "matchday": m.get("matchday"),
                  "status": m.get("status"), "utcDate": m.get("utcDate"),
                  "home": (m.get("homeTeam") or {}).get("name"),
-                 "away": (m.get("awayTeam") or {}).get("name")}
+                 "away": (m.get("awayTeam") or {}).get("name"),
+                 "score": m.get("score")}
+                for m in matches if m.get("status") == "FINISHED"
+            ] or [
+                {"id": m.get("id"), "stage": m.get("stage"), "matchday": m.get("matchday"),
+                 "status": m.get("status"), "utcDate": m.get("utcDate"),
+                 "home": (m.get("homeTeam") or {}).get("name"),
+                 "away": (m.get("awayTeam") or {}).get("name"),
+                 "score": m.get("score")}
                 for m in matches[:5]
             ],
         })
