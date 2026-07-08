@@ -123,10 +123,11 @@ def fetch_fixtures(season_year: int, matchday: int = None, competition_code: str
         away_score = regular_time.get("away") if regular_time.get("away") is not None else full_time.get("away")
 
         # Nom des équipes : shortName ou name
-        home = match["homeTeam"]
-        away = match["awayTeam"]
-        home_name = translate_team(home.get("shortName") or home.get("name", "?"))
-        away_name = translate_team(away.get("shortName") or away.get("name", "?"))
+        # En phases à élimination directe, les équipes peuvent ne pas encore être connues (null)
+        home = match.get("homeTeam") or {}
+        away = match.get("awayTeam") or {}
+        home_name = translate_team(home.get("shortName") or home.get("name") or "TBD")
+        away_name = translate_team(away.get("shortName") or away.get("name") or "TBD")
 
         result.append({
             "external_id": match.get("id"),
@@ -163,6 +164,7 @@ def import_matchday_to_db(season_year: int, matchday_number: int,
 
     for f in fixtures:
         try:
+            q(conn, "SAVEPOINT sp_match")
             existing = qone(conn, "SELECT id FROM matches WHERE external_id=%s", (f["external_id"],))
             if existing:
                 q(conn, """UPDATE matches SET home_team=%s, away_team=%s, kickoff_time=%s,
@@ -175,8 +177,10 @@ def import_matchday_to_db(season_year: int, matchday_number: int,
                   (matchday_id, f["home_team"], f["away_team"], f["kickoff_time"],
                    f["home_score"], f["away_score"], f["status"], f["external_id"]))
                 imported += 1
+            q(conn, "RELEASE SAVEPOINT sp_match")
         except Exception as e:
-            errors.append(str(e))
+            q(conn, "ROLLBACK TO SAVEPOINT sp_match")
+            errors.append(f"{f.get('home_team','?')} vs {f.get('away_team','?')} : {e}")
 
     conn.commit()
     return imported, errors
@@ -190,9 +194,16 @@ def update_live_scores(season_year: int, conn, competition_code: str = "FL1") ->
     from database import q, qone
     updated = 0
     for f in fixtures:
-        if f["external_id"] and f["status"] in ("finished", "live"):
-            result = q(conn, "UPDATE matches SET home_score=%s, away_score=%s, status=%s WHERE external_id=%s",
-                (f["home_score"], f["away_score"], f["status"], f["external_id"]))
+        if f["external_id"] and f["status"] in ("finished", "live", "scheduled"):
+            # On met à jour aussi les noms d'équipes : utile quand elles étaient "TBD"
+            # à l'import et sont maintenant connues (phases à élimination directe)
+            home = f["home_team"]
+            away = f["away_team"]
+            if home == "TBD" and away == "TBD":
+                continue  # pas encore connues, on ne touche pas à la ligne
+            result = q(conn, """UPDATE matches SET home_team=%s, away_team=%s,
+                home_score=%s, away_score=%s, status=%s WHERE external_id=%s""",
+                (home, away, f["home_score"], f["away_score"], f["status"], f["external_id"]))
             if result.rowcount > 0:
                 updated += 1
     conn.commit()
