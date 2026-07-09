@@ -1653,9 +1653,7 @@ def send_email_brevo(to_email: str, subject: str, body: str):
         msg["From"] = f"{BREVO_FROM_NAME} <{BREVO_FROM_EMAIL}>"
         msg["To"] = to_email
         msg["Subject"] = subject
-        with smtplib.SMTP(BREVO_SMTP_HOST, 587, timeout=15) as server:
-            server.ehlo()
-            server.starttls()
+        with smtplib.SMTP_SSL(BREVO_SMTP_HOST, 465, timeout=15) as server:
             server.ehlo()
             server.login(BREVO_SMTP_USER, BREVO_SMTP_PASS)
             server.sendmail(BREVO_FROM_EMAIL, to_email, msg.as_string())
@@ -2124,9 +2122,7 @@ def send_csv_backup(season_name: str, matchday_label: str, csv_content: str):
         encoders.encode_base64(part)
         part.add_header("Content-Disposition", f"attachment; filename={filename}")
         msg.attach(part)
-        with smtplib.SMTP(BREVO_SMTP_HOST, 587, timeout=15) as server:
-            server.ehlo()
-            server.starttls()
+        with smtplib.SMTP_SSL(BREVO_SMTP_HOST, 465, timeout=15) as server:
             server.ehlo()
             server.login(BREVO_SMTP_USER, BREVO_SMTP_PASS)
             server.sendmail(BREVO_FROM_EMAIL, BREVO_TO, msg.as_string())
