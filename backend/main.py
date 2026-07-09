@@ -1637,39 +1637,31 @@ def send_telegram(chat_id: str, text: str) -> bool:
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
 BREVO_FROM_EMAIL = os.environ.get("BREVO_FROM_EMAIL", "pronos.ente.va@gmail.com")
 BREVO_FROM_NAME = os.environ.get("BREVO_FROM_NAME", "ENTE Pronostics")
+BREVO_SMTP_HOST = os.environ.get("BREVO_SMTP_HOST", "smtp-relay.brevo.com")
+BREVO_SMTP_USER = os.environ.get("BREVO_SMTP_USER", "")
+BREVO_SMTP_PASS = os.environ.get("BREVO_SMTP_PASS", "")
 
 def send_email_brevo(to_email: str, subject: str, body: str):
-    """Envoie un email via l'API HTTPS de Brevo (300 emails/jour gratuits, pas de domaine requis).
+    """Envoie un email via le SMTP relay Brevo.
     Retourne (ok: bool, detail: str)."""
-    if not BREVO_API_KEY or not to_email:
-        return False, "BREVO_API_KEY non défini ou destinataire manquant."
+    if not BREVO_SMTP_USER or not BREVO_SMTP_PASS or not to_email:
+        return False, "BREVO_SMTP_USER ou BREVO_SMTP_PASS non défini, ou destinataire manquant."
     try:
-        import urllib.request, urllib.error, json
-        payload = json.dumps({
-            "sender": {"name": BREVO_FROM_NAME, "email": BREVO_FROM_EMAIL},
-            "to": [{"email": to_email}],
-            "subject": subject,
-            "textContent": body,
-        }).encode()
-        req = urllib.request.Request(
-            "https://api.brevo.com/v3/smtp/email",
-            data=payload,
-            method="POST",
-            headers={
-                "api-key": BREVO_API_KEY,
-                "Content-Type": "application/json",
-                "User-Agent": "ligue1-pronostics/1.0",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            resp.read()
+        import smtplib
+        from email.mime.text import MIMEText
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["From"] = f"{BREVO_FROM_NAME} <{BREVO_FROM_EMAIL}>"
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        with smtplib.SMTP(BREVO_SMTP_HOST, 587, timeout=15) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(BREVO_SMTP_USER, BREVO_SMTP_PASS)
+            server.sendmail(BREVO_FROM_EMAIL, to_email, msg.as_string())
         return True, "ok"
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", errors="replace")
-        print(f"Brevo HTTP error {e.code}: {detail}")
-        return False, f"HTTP {e.code}: {detail[:300]}"
     except Exception as e:
-        print(f"Brevo error: {e}")
+        print(f"Brevo SMTP error: {e}")
         return False, str(e)
 
 def send_reminder_email(to_email: str, subject: str, body: str) -> bool:
@@ -1683,10 +1675,10 @@ async def test_email(request: Request, to: str = ""):
     require_admin(request)
     if not to:
         return JSONResponse({"ok": False, "error": "Paramètre 'to' manquant. Utilisez /admin/test-email?to=adresse@exemple.com"})
-    if not BREVO_API_KEY:
-        return JSONResponse({"ok": False, "error": "BREVO_API_KEY n'est pas défini dans les variables d'environnement."})
+    if not BREVO_SMTP_PASS:
+        return JSONResponse({"ok": False, "error": "BREVO_SMTP_PASS n'est pas défini dans les variables d'environnement."})
     ok, detail = send_email_brevo(to, "Test email - Ligue 1 Pronostics",
-        "Ceci est un email de test envoyé depuis /admin/test-email. Si vous le recevez, la config Brevo fonctionne.")
+        "Ceci est un email de test envoyé depuis /admin/test-email. Si vous le recevez, la config Brevo SMTP fonctionne.")
     return JSONResponse({"ok": ok, "to": to, "brevo_from": BREVO_FROM_EMAIL, "detail": detail})
 
 @app.get("/telegram/webhook-info")
@@ -2111,36 +2103,33 @@ import base64
 BREVO_TO = os.environ.get("BREVO_TO", "pronos.ente.va@gmail.com")
 
 def send_csv_backup(season_name: str, matchday_label: str, csv_content: str):
-    """Envoie le CSV par mail via l'API Brevo, avec le CSV en pièce jointe."""
-    if not BREVO_API_KEY:
-        print("BREVO_API_KEY non défini, mail non envoyé.")
+    """Envoie le CSV par mail via le SMTP relay Brevo, avec le CSV en pièce jointe."""
+    if not BREVO_SMTP_PASS:
+        print("BREVO_SMTP_PASS non défini, mail non envoyé.")
         return False
     try:
-        import urllib.request, urllib.error, json
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        from email.mime.base import MIMEBase
+        from email import encoders
         filename = f"pronos_{season_name.replace(' ','_')}_{matchday_label.replace(' ','_')}.csv"
-        body = f"Backup automatique des pronostics.\n\nSaison : {season_name}\nJournée : {matchday_label}"
-        payload = json.dumps({
-            "sender": {"name": BREVO_FROM_NAME, "email": BREVO_FROM_EMAIL},
-            "to": [{"email": BREVO_TO}],
-            "subject": f"[ENTE Pronos] Backup {season_name} — {matchday_label}",
-            "textContent": body,
-            "attachment": [{
-                "name": filename,
-                "content": base64.b64encode(csv_content.encode("utf-8")).decode("ascii"),
-            }],
-        }).encode()
-        req = urllib.request.Request(
-            "https://api.brevo.com/v3/smtp/email",
-            data=payload,
-            method="POST",
-            headers={
-                "api-key": BREVO_API_KEY,
-                "Content-Type": "application/json",
-                "User-Agent": "ligue1-pronostics/1.0",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            resp.read()
+        msg = MIMEMultipart()
+        msg["From"] = f"{BREVO_FROM_NAME} <{BREVO_FROM_EMAIL}>"
+        msg["To"] = BREVO_TO
+        msg["Subject"] = f"[ENTE Pronos] Backup {season_name} — {matchday_label}"
+        msg.attach(MIMEText(f"Backup automatique des pronostics.\n\nSaison : {season_name}\nJournée : {matchday_label}", "plain", "utf-8"))
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(csv_content.encode("utf-8"))
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", f"attachment; filename={filename}")
+        msg.attach(part)
+        with smtplib.SMTP(BREVO_SMTP_HOST, 587, timeout=15) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(BREVO_SMTP_USER, BREVO_SMTP_PASS)
+            server.sendmail(BREVO_FROM_EMAIL, BREVO_TO, msg.as_string())
         print(f"Mail backup envoyé : {filename}")
         return True
     except Exception as e:
