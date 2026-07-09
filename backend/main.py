@@ -1634,28 +1634,29 @@ def send_telegram(chat_id: str, text: str) -> bool:
         print(f"Telegram error: {e}")
         return False
 
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
-RESEND_FROM = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+BREVO_FROM_EMAIL = os.environ.get("BREVO_FROM_EMAIL", "pronos.ente.va@gmail.com")
+BREVO_FROM_NAME = os.environ.get("BREVO_FROM_NAME", "ENTE Pronostics")
 
-def send_email_resend(to_email: str, subject: str, body: str):
-    """Envoie un email via l'API HTTPS de Resend (le SMTP sortant est bloqué sur Railway hors plan Pro).
+def send_email_brevo(to_email: str, subject: str, body: str):
+    """Envoie un email via l'API HTTPS de Brevo (300 emails/jour gratuits, pas de domaine requis).
     Retourne (ok: bool, detail: str)."""
-    if not RESEND_API_KEY or not to_email:
-        return False, "RESEND_API_KEY non défini ou destinataire manquant."
+    if not BREVO_API_KEY or not to_email:
+        return False, "BREVO_API_KEY non défini ou destinataire manquant."
     try:
         import urllib.request, urllib.error, json
         payload = json.dumps({
-            "from": RESEND_FROM,
-            "to": [to_email],
+            "sender": {"name": BREVO_FROM_NAME, "email": BREVO_FROM_EMAIL},
+            "to": [{"email": to_email}],
             "subject": subject,
-            "text": body,
+            "textContent": body,
         }).encode()
         req = urllib.request.Request(
-            "https://api.resend.com/emails",
+            "https://api.brevo.com/v3/smtp/email",
             data=payload,
             method="POST",
             headers={
-                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "api-key": BREVO_API_KEY,
                 "Content-Type": "application/json",
                 "User-Agent": "ligue1-pronostics/1.0",
             },
@@ -1665,28 +1666,28 @@ def send_email_resend(to_email: str, subject: str, body: str):
         return True, "ok"
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", errors="replace")
-        print(f"Resend HTTP error {e.code}: {detail}")
+        print(f"Brevo HTTP error {e.code}: {detail}")
         return False, f"HTTP {e.code}: {detail[:300]}"
     except Exception as e:
-        print(f"Resend error: {e}")
+        print(f"Brevo error: {e}")
         return False, str(e)
 
 def send_reminder_email(to_email: str, subject: str, body: str) -> bool:
-    """Envoie un email de rappel (via Resend)."""
-    ok, _ = send_email_resend(to_email, subject, body)
+    """Envoie un email de rappel (via Brevo)."""
+    ok, _ = send_email_brevo(to_email, subject, body)
     return ok
 
 @app.get("/admin/test-email")
 async def test_email(request: Request, to: str = ""):
-    """Teste l'envoi d'un email de rappel via Resend, avec détail de l'erreur le cas échéant."""
+    """Teste l'envoi d'un email via Brevo, avec détail de l'erreur le cas échéant."""
     require_admin(request)
     if not to:
         return JSONResponse({"ok": False, "error": "Paramètre 'to' manquant. Utilisez /admin/test-email?to=adresse@exemple.com"})
-    if not RESEND_API_KEY:
-        return JSONResponse({"ok": False, "error": "RESEND_API_KEY n'est pas défini dans les variables d'environnement."})
-    ok, detail = send_email_resend(to, "Test email - Ligue 1 Pronostics",
-        "Ceci est un email de test envoyé depuis /admin/test-email. Si vous le recevez, la config Resend fonctionne.")
-    return JSONResponse({"ok": ok, "to": to, "resend_from": RESEND_FROM, "detail": detail})
+    if not BREVO_API_KEY:
+        return JSONResponse({"ok": False, "error": "BREVO_API_KEY n'est pas défini dans les variables d'environnement."})
+    ok, detail = send_email_brevo(to, "Test email - Ligue 1 Pronostics",
+        "Ceci est un email de test envoyé depuis /admin/test-email. Si vous le recevez, la config Brevo fonctionne.")
+    return JSONResponse({"ok": ok, "to": to, "brevo_from": BREVO_FROM_EMAIL, "detail": detail})
 
 @app.get("/telegram/webhook-info")
 async def telegram_info(request: Request):
@@ -2107,33 +2108,33 @@ import csv
 import io
 import base64
 
-RESEND_TO = os.environ.get("RESEND_TO", "pronos.ente.va@gmail.com")
+BREVO_TO = os.environ.get("BREVO_TO", "pronos.ente.va@gmail.com")
 
 def send_csv_backup(season_name: str, matchday_label: str, csv_content: str):
-    """Envoie le CSV par mail via l'API Resend, avec le CSV en pièce jointe."""
-    if not RESEND_API_KEY:
-        print("RESEND_API_KEY non défini, mail non envoyé.")
+    """Envoie le CSV par mail via l'API Brevo, avec le CSV en pièce jointe."""
+    if not BREVO_API_KEY:
+        print("BREVO_API_KEY non défini, mail non envoyé.")
         return False
     try:
         import urllib.request, urllib.error, json
         filename = f"pronos_{season_name.replace(' ','_')}_{matchday_label.replace(' ','_')}.csv"
         body = f"Backup automatique des pronostics.\n\nSaison : {season_name}\nJournée : {matchday_label}"
         payload = json.dumps({
-            "from": RESEND_FROM,
-            "to": [RESEND_TO],
+            "sender": {"name": BREVO_FROM_NAME, "email": BREVO_FROM_EMAIL},
+            "to": [{"email": BREVO_TO}],
             "subject": f"[ENTE Pronos] Backup {season_name} — {matchday_label}",
-            "text": body,
-            "attachments": [{
-                "filename": filename,
+            "textContent": body,
+            "attachment": [{
+                "name": filename,
                 "content": base64.b64encode(csv_content.encode("utf-8")).decode("ascii"),
             }],
         }).encode()
         req = urllib.request.Request(
-            "https://api.resend.com/emails",
+            "https://api.brevo.com/v3/smtp/email",
             data=payload,
             method="POST",
             headers={
-                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "api-key": BREVO_API_KEY,
                 "Content-Type": "application/json",
                 "User-Agent": "ligue1-pronostics/1.0",
             },
