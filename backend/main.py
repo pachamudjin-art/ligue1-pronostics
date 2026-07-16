@@ -1677,6 +1677,22 @@ def send_reminder_email(to_email: str, subject: str, body: str) -> bool:
     ok, _ = send_email_brevo(to_email, subject, body)
     return ok
 
+@app.get("/admin/debug-brevo")
+async def admin_debug_brevo(request: Request):
+    """Debug : vérifie ce que Railway lit comme clé Brevo (sans révéler le milieu)."""
+    require_admin(request)
+    key = BREVO_API_KEY
+    return JSONResponse({
+        "key_defined": bool(key),
+        "key_length": len(key),
+        "key_start": key[:12] if len(key) >= 12 else key,
+        "key_end": key[-6:] if len(key) >= 6 else "",
+        "starts_with_xkeysib": key.startswith("xkeysib-"),
+        "has_whitespace": key != key.strip(),
+        "from_email": BREVO_FROM_EMAIL,
+        "from_name": BREVO_FROM_NAME,
+    })
+
 @app.get("/admin/test-email")
 async def test_email(request: Request, to: str = ""):
     """Teste l'envoi d'un email via Brevo, avec détail de l'erreur le cas échéant."""
