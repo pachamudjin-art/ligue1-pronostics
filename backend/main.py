@@ -1542,6 +1542,37 @@ async def admin_import_ods(request: Request):
 
 # ─── Debug ────────────────────────────────────────────────────────────────────
 
+@app.get("/admin/check-podium")
+async def admin_check_podium(request: Request):
+    """Liste les utilisateurs ayant fait leur prono podium pour la saison active, et ceux qui ne l'ont pas fait."""
+    require_admin(request)
+    season = get_active_season()
+    if not season:
+        return JSONResponse({"ok": False, "error": "Aucune saison active"})
+    conn = get_db()
+    rows = qall(conn, """
+        SELECT u.username, pp.rank1, pp.rank2, pp.rank3
+        FROM users u
+        LEFT JOIN podium_pronostics pp
+          ON pp.user_id = u.id AND pp.season_id = %s
+        ORDER BY u.username
+    """, (season["id"],))
+    release_db(conn)
+    done, missing = [], []
+    for r in rows:
+        if r["rank1"]:
+            done.append({"username": r["username"], "rank1": r["rank1"], "rank2": r["rank2"], "rank3": r["rank3"]})
+        else:
+            missing.append(r["username"])
+    return JSONResponse({
+        "ok": True,
+        "season": season["name"],
+        "nb_done": len(done),
+        "nb_missing": len(missing),
+        "missing": missing,
+        "done": done,
+    })
+
 @app.get("/admin/check-pronos")
 async def admin_check_pronos(request: Request, username: str = ""):
     """Vérifie les pronostics enregistrés pour un utilisateur (preuve en cas de litige)."""
