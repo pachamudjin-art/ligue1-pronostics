@@ -2062,6 +2062,58 @@ async def cron_notify_debug(request: Request):
     release_db(conn)
     return JSONResponse({"now_utc": now.isoformat(), "upcoming": result, "subscriptions": len(subs)})
 
+@app.post("/admin/cron-import-fixtures")
+async def cron_import_fixtures(request: Request):
+    """Appelé par cron-job.org (1x/jour) : réimporte les journées à venir ou en cours
+    pour rafraîchir les horaires, équipes et scores depuis l'API football-data.org.
+    Les journées entièrement terminées ne sont pas touchées.
+    """
+    secret = request.headers.get("X-Cron-Secret", "")
+    cron_secret = os.environ.get("CRON_SECRET", "")
+    if cron_secret and secret != cron_secret:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    season = get_active_season()
+    if not season:
+        return JSONResponse({"ok": False, "error": "Aucune saison active"})
+
+    conn = get_db()
+    # Sélectionne uniquement les journées non entièrement terminées
+    # (au moins un match sans score ou avec status != 'finished')
+    matchdays_to_refresh = qall(conn, """
+        SELECT DISTINCT md.id, md.number
+        FROM matchdays md
+        JOIN matches m ON m.matchday_id = md.id
+        WHERE md.season_id = %s
+          AND (m.home_score IS NULL OR m.status != 'finished')
+        ORDER BY md.number
+    """, (season["id"],))
+
+    api_code = season.get("api_code", "FL1")
+    year_to_use = season["year_start"]
+    results = []
+    total_imported = 0
+
+    for md in matchdays_to_refresh:
+        try:
+            nb, errors = import_matchday_to_db(
+                year_to_use, md["number"], season["id"], md["id"], conn,
+                competition_code=api_code
+            )
+            total_imported += nb
+            results.append({"journee": md["number"], "imported": nb, "errors": errors[:3]})
+        except Exception as e:
+            results.append({"journee": md["number"], "error": str(e)})
+
+    release_db(conn)
+    return JSONResponse({
+        "ok": True,
+        "season": season["name"],
+        "nb_journees_traitees": len(matchdays_to_refresh),
+        "nb_nouveaux_matchs": total_imported,
+        "details": results,
+    })
+
 @app.post("/admin/cron-notify")
 async def cron_notify(request: Request):
     """Appelé par cron-job.org toutes les heures — envoie les notifications si nécessaire."""
