@@ -1573,6 +1573,30 @@ async def admin_check_podium(request: Request):
         "done": done,
     })
 
+@app.get("/admin/check-notif-prefs")
+async def admin_check_notif_prefs(request: Request):
+    """Debug : liste les préférences de notification de chaque utilisateur."""
+    require_admin(request)
+    conn = get_db()
+    rows = qall(conn, """
+        SELECT u.username, un.email, un.telegram_chat_id, un.notify_24h, un.notify_2h
+        FROM users u
+        LEFT JOIN user_notifications un ON un.user_id = u.id
+        ORDER BY u.username
+    """)
+    release_db(conn)
+    return JSONResponse({
+        "ok": True,
+        "users": [{
+            "username": r["username"],
+            "email": r["email"] or "—",
+            "telegram_chat_id": r["telegram_chat_id"] or "—",
+            "notify_24h": bool(r["notify_24h"]) if r["notify_24h"] is not None else False,
+            "notify_2h": bool(r["notify_2h"]) if r["notify_2h"] is not None else False,
+            "eligible_recap": bool(r["notify_24h"] or r["notify_2h"]),
+        } for r in rows]
+    })
+
 @app.get("/admin/check-pronos")
 async def admin_check_pronos(request: Request, username: str = ""):
     """Vérifie les pronostics enregistrés pour un utilisateur (preuve en cas de litige)."""
