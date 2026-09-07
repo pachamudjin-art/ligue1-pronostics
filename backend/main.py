@@ -2114,6 +2114,279 @@ async def cron_import_fixtures(request: Request):
         "details": results,
     })
 
+def _ensure_recap_table(conn):
+    """Crée la table de suivi des récaps envoyés si elle n'existe pas."""
+    q(conn, """CREATE TABLE IF NOT EXISTS matchday_recap_sent (
+        matchday_id INTEGER PRIMARY KEY REFERENCES matchdays(id),
+        sent_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))""")
+    conn.commit()
+
+def build_matchday_recap(conn, season, matchday):
+    """Construit le message de récap d'une journée terminée.
+    Retourne (subject, body_text, body_html)."""
+    from collections import defaultdict
+
+    matches = qall(conn, "SELECT * FROM matches WHERE matchday_id=%s", (matchday["id"],))
+    all_users = qall(conn, "SELECT id, username FROM users ORDER BY username")
+
+    # ── Classement de la journée ─────────────────────────────────
+    journee_players = []
+    for u in all_users:
+        pronos_j = qall(conn, """
+            SELECT p.home_score as pred_home, p.away_score as pred_away,
+                   m.home_score as real_home, m.away_score as real_away
+            FROM pronostics p JOIN matches m ON m.id=p.match_id
+            WHERE p.user_id=%s AND m.matchday_id=%s
+              AND m.home_score IS NOT NULL AND m.away_score IS NOT NULL
+        """, (u["id"], matchday["id"]))
+        if not pronos_j:
+            continue
+        stats = compute_matchday_stats([dict(p) for p in pronos_j])
+        journee_players.append({
+            "username": u["username"], "points": stats["points"],
+            "pj": stats["pj"], "pp": stats["pp"], "pa": stats["pa"], "bb": stats["bb"],
+        })
+    journee_ranked = compute_general_ranking(journee_players)
+
+    # ── Classement général actuel (après cette journée) ─────────
+    general_now = _build_general_ranking(conn, season["id"], up_to_matchday_number=matchday["number"])
+    general_before = _build_general_ranking(conn, season["id"], up_to_matchday_number=matchday["number"] - 1)
+
+    # Map rangs avant/après pour calculer les évolutions
+    rank_before = {p["username"]: p["rank"] for p in general_before}
+    rank_after = {p["username"]: p["rank"] for p in general_now}
+
+    # ── Faits marquants ──────────────────────────────────────────
+    facts = []
+    if journee_ranked:
+        best = journee_ranked[0]
+        worst = journee_ranked[-1]
+        # Meilleur perf de la saison ?
+        all_journees_records = qall(conn, """
+            SELECT p.user_id, m.matchday_id,
+                   SUM(CASE
+                       WHEN p.home_score=m.home_score AND p.away_score=m.away_score
+                            AND (m.home_score+m.away_score)>=4 THEN 6
+                       WHEN p.home_score=m.home_score AND p.away_score=m.away_score THEN 4
+                       WHEN (m.home_score-m.away_score)*(p.home_score-p.away_score) > 0
+                            AND ABS(ABS(m.home_score-m.away_score)-ABS(p.home_score-p.away_score))<=1
+                            AND ABS((m.home_score+m.away_score)-(p.home_score+p.away_score))<=2 THEN 3
+                       WHEN (m.home_score-m.away_score)*(p.home_score-p.away_score) > 0
+                            OR (m.home_score=m.away_score AND p.home_score=p.away_score) THEN 2
+                       ELSE 0 END) as pts
+            FROM pronostics p JOIN matches m ON m.id=p.match_id
+            JOIN matchdays md ON md.id=m.matchday_id
+            WHERE md.season_id=%s AND m.home_score IS NOT NULL
+            GROUP BY p.user_id, m.matchday_id
+        """, (season["id"],))
+        # Historique des scores de journée du meilleur joueur
+        best_uid = qone(conn, "SELECT id FROM users WHERE username=%s", (best["username"],))
+        if best_uid:
+            past_scores = [r["pts"] for r in all_journees_records
+                           if r["user_id"] == best_uid["id"] and r["matchday_id"] != matchday["id"]]
+            if past_scores and best["points"] > max(past_scores):
+                facts.append(f"🔥 <b>{best['username']}</b> signe sa meilleure journée de la saison !")
+
+        # Bonus Belle Bourré (score exact 4+ buts) mis en avant
+        bb_players = [p for p in journee_ranked if p["bb"] > 0]
+        if bb_players:
+            noms = ", ".join(f"<b>{p['username']}</b>" for p in bb_players)
+            facts.append(f"🎯 Belle Bourrée pour {noms} !")
+
+        # Score de zéro sur toute la journée
+        zero_players = [p for p in journee_ranked if p["points"] == 0]
+        if zero_players:
+            noms = ", ".join(f"<b>{p['username']}</b>" for p in zero_players)
+            facts.append(f"😬 Zéro pointé pour {noms} sur cette journée…")
+
+    # Belle remontada / gros plongeon au général
+    biggest_climb = None
+    biggest_fall = None
+    for p in general_now:
+        before = rank_before.get(p["username"])
+        after = p["rank"]
+        if before is None:
+            continue
+        delta = before - after  # positif = a gagné des places
+        if biggest_climb is None or delta > biggest_climb[1]:
+            biggest_climb = (p["username"], delta)
+        if biggest_fall is None or delta < biggest_fall[1]:
+            biggest_fall = (p["username"], delta)
+    if biggest_climb and biggest_climb[1] >= 2:
+        facts.append(f"📈 Belle remontée de <b>{biggest_climb[0]}</b> au général (+{biggest_climb[1]} places).")
+    if biggest_fall and biggest_fall[1] <= -2:
+        facts.append(f"📉 Gros plongeon pour <b>{biggest_fall[0]}</b> ({biggest_fall[1]} places).")
+
+    # Cuillère en bois
+    if general_now:
+        last = general_now[-1]
+        facts.append(f"🥄 Cuillère en bois actuelle pour <b>{last['username']}</b>. Courage !")
+
+    # ── Construction du message ──────────────────────────────────
+    medals = ["🥇", "🥈", "🥉"]
+    def arrow(before, after):
+        if before is None:
+            return ""
+        if after < before:
+            return f" ⬆️(+{before - after})"
+        if after > before:
+            return f" ⬇️(-{after - before})"
+        return " ➡️"
+
+    # Version texte (Telegram HTML compatible)
+    lines = [f"🏆 <b>Résultats de la {matchday['label']}</b>", ""]
+    lines.append("<b>Classement de la journée :</b>")
+    for i, p in enumerate(journee_ranked[:10]):
+        prefix = medals[i] if i < 3 else f"{p['rank']}."
+        lines.append(f"{prefix} {p['username']} — {p['points']} pts")
+    lines.append("")
+    lines.append("<b>Classement général :</b>")
+    for p in general_now[:10]:
+        before = rank_before.get(p["username"])
+        lines.append(f"{p['rank']}. {p['username']} — {p['points']} pts{arrow(before, p['rank'])}")
+    if facts:
+        lines.append("")
+        lines.append("<b>💫 À noter :</b>")
+        for f in facts:
+            lines.append(f"• {f}")
+    body_html = "\n".join(lines)
+
+    # Version texte pure (email plain-text — retire les balises HTML)
+    import re
+    body_text = re.sub(r"<[^>]+>", "", body_html)
+
+    subject = f"🏆 Récap {matchday['label']} — {season['name']}"
+    return subject, body_text, body_html
+
+
+def _build_general_ranking(conn, season_id, up_to_matchday_number=None):
+    """Construit le classement général jusqu'à la journée N incluse (ou tout si None)."""
+    users = qall(conn, "SELECT id, username FROM users ORDER BY username")
+    players = []
+    for u in users:
+        params = [u["id"], season_id]
+        clause = ""
+        if up_to_matchday_number is not None:
+            clause = "AND md.number <= %s"
+            params.append(up_to_matchday_number)
+        pronos = qall(conn, f"""
+            SELECT p.home_score as pred_home, p.away_score as pred_away,
+                   m.home_score as real_home, m.away_score as real_away
+            FROM pronostics p JOIN matches m ON m.id=p.match_id
+            JOIN matchdays md ON md.id=m.matchday_id
+            WHERE p.user_id=%s AND md.season_id=%s {clause}
+              AND m.home_score IS NOT NULL AND m.away_score IS NOT NULL
+        """, tuple(params))
+        if not pronos:
+            continue
+        stats = compute_matchday_stats([dict(p) for p in pronos])
+        players.append({
+            "username": u["username"], "points": stats["points"],
+            "pj": stats["pj"], "pp": stats["pp"], "pa": stats["pa"], "bb": stats["bb"],
+        })
+    return compute_general_ranking(players)
+
+
+@app.post("/admin/cron-recap")
+async def cron_recap(request: Request):
+    """Appelé 1x/jour : envoie le récap des journées terminées non encore notifiées."""
+    secret = request.headers.get("X-Cron-Secret", "")
+    cron_secret = os.environ.get("CRON_SECRET", "")
+    if cron_secret and secret != cron_secret:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    conn = get_db()
+    _ensure_recap_table(conn)
+
+    season = get_active_season()
+    if not season:
+        release_db(conn)
+        return JSONResponse({"ok": False, "error": "Aucune saison active"})
+
+    # Trouver les journées entièrement terminées ET pas encore notifiées
+    candidates = qall(conn, """
+        SELECT md.*
+        FROM matchdays md
+        WHERE md.season_id = %s
+          AND NOT EXISTS (SELECT 1 FROM matches m WHERE m.matchday_id = md.id
+                                                AND (m.home_score IS NULL OR m.status != 'finished'))
+          AND EXISTS (SELECT 1 FROM matches m WHERE m.matchday_id = md.id)
+          AND NOT EXISTS (SELECT 1 FROM matchday_recap_sent r WHERE r.matchday_id = md.id)
+        ORDER BY md.number
+    """, (season["id"],))
+
+    if not candidates:
+        release_db(conn)
+        return JSONResponse({"ok": True, "message": "Aucune journée à notifier."})
+
+    # Récupérer les destinataires
+    recipients = qall(conn, """
+        SELECT un.email, un.telegram_chat_id
+        FROM user_notifications un
+        WHERE un.notify_24h=1 OR un.notify_2h=1
+    """)
+
+    sent_details = []
+    for md in candidates:
+        subject, body_text, body_html = build_matchday_recap(conn, season, md)
+        emails_ok = emails_ko = tg_ok = tg_ko = 0
+        for r in recipients:
+            if r["email"]:
+                ok, _ = send_email_brevo(r["email"], subject, body_text)
+                if ok: emails_ok += 1
+                else: emails_ko += 1
+            if r["telegram_chat_id"]:
+                if send_telegram(r["telegram_chat_id"], body_html):
+                    tg_ok += 1
+                else:
+                    tg_ko += 1
+        # Marquer comme envoyé (même si aucun destinataire — évite de retenter en boucle)
+        q(conn, "INSERT INTO matchday_recap_sent (matchday_id) VALUES (%s) ON CONFLICT DO NOTHING", (md["id"],))
+        conn.commit()
+        sent_details.append({
+            "journee": md["number"], "label": md["label"],
+            "emails_ok": emails_ok, "emails_ko": emails_ko,
+            "telegram_ok": tg_ok, "telegram_ko": tg_ko,
+        })
+
+    release_db(conn)
+    return JSONResponse({"ok": True, "sent": sent_details})
+
+
+@app.get("/admin/preview-recap")
+async def admin_preview_recap(request: Request, matchday_number: int = None):
+    """Prévisualise le récap d'une journée (sans envoyer)."""
+    require_admin(request)
+    conn = get_db()
+    _ensure_recap_table(conn)
+    season = get_active_season()
+    if not season:
+        release_db(conn)
+        return JSONResponse({"ok": False, "error": "Aucune saison active"})
+    if matchday_number:
+        md = qone(conn, "SELECT * FROM matchdays WHERE season_id=%s AND number=%s",
+                  (season["id"], matchday_number))
+    else:
+        # Dernière journée terminée
+        md = qone(conn, """
+            SELECT md.* FROM matchdays md
+            WHERE md.season_id = %s
+              AND NOT EXISTS (SELECT 1 FROM matches m WHERE m.matchday_id = md.id
+                                                    AND (m.home_score IS NULL OR m.status != 'finished'))
+              AND EXISTS (SELECT 1 FROM matches m WHERE m.matchday_id = md.id)
+            ORDER BY md.number DESC LIMIT 1
+        """, (season["id"],))
+    if not md:
+        release_db(conn)
+        return JSONResponse({"ok": False, "error": "Journée introuvable ou pas encore terminée."})
+    subject, body_text, body_html = build_matchday_recap(conn, season, md)
+    release_db(conn)
+    return JSONResponse({
+        "ok": True, "matchday": md["number"], "label": md["label"],
+        "subject": subject, "body_html": body_html, "body_text": body_text,
+    })
+
+
 @app.post("/admin/cron-notify")
 async def cron_notify(request: Request):
     """Appelé par cron-job.org toutes les heures — envoie les notifications si nécessaire."""
