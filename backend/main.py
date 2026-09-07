@@ -1573,6 +1573,79 @@ async def admin_check_podium(request: Request):
         "done": done,
     })
 
+@app.get("/admin/debug-recap")
+async def admin_debug_recap(request: Request, matchday_number: int = None, send: str = "0"):
+    """Debug du récap : trace exactement les étapes.
+    ?matchday_number=N pour cibler une journée précise
+    ?send=1 pour tenter l'envoi réel (sans marquer comme envoyé côté anti-doublon)"""
+    require_admin(request)
+    conn = get_db()
+    _ensure_recap_table(conn)
+    season = get_active_season()
+    trace = {"season": season["name"] if season else None}
+
+    # 1. Trouver la journée à traiter
+    if matchday_number:
+        md = qone(conn, "SELECT * FROM matchdays WHERE season_id=%s AND number=%s",
+                  (season["id"], matchday_number))
+    else:
+        md = qone(conn, """
+            SELECT md.* FROM matchdays md
+            WHERE md.season_id = %s
+              AND NOT EXISTS (SELECT 1 FROM matches m WHERE m.matchday_id = md.id
+                                                    AND (m.home_score IS NULL OR m.status != 'finished'))
+              AND EXISTS (SELECT 1 FROM matches m WHERE m.matchday_id = md.id)
+            ORDER BY md.number DESC LIMIT 1
+        """, (season["id"],))
+    if not md:
+        release_db(conn)
+        return JSONResponse({"trace": trace, "error": "Journée introuvable ou pas encore terminée"})
+    trace["matchday"] = {"number": md["number"], "label": md["label"], "id": md["id"]}
+
+    # 2. Vérifier si déjà notifiée
+    already = qone(conn, "SELECT sent_at FROM matchday_recap_sent WHERE matchday_id=%s", (md["id"],))
+    trace["already_sent"] = dict(already) if already else None
+
+    # 3. Vérifier destinataires
+    recipients = qall(conn, """
+        SELECT un.email, un.telegram_chat_id, un.notify_24h, un.notify_2h
+        FROM user_notifications un
+        WHERE un.notify_24h=1 OR un.notify_2h=1
+    """)
+    trace["nb_recipients"] = len(recipients)
+    trace["recipients"] = [dict(r) for r in recipients]
+
+    # 4. Construire le récap
+    try:
+        subject, body_text, body_html = build_matchday_recap(conn, season, md)
+        trace["build_ok"] = True
+        trace["subject"] = subject
+        trace["body_text_len"] = len(body_text)
+    except Exception as e:
+        import traceback
+        trace["build_ok"] = False
+        trace["build_error"] = str(e)
+        trace["traceback"] = traceback.format_exc().splitlines()[-6:]
+        release_db(conn)
+        return JSONResponse({"trace": trace})
+
+    # 5. Tenter l'envoi si demandé
+    if send == "1":
+        results = []
+        for r in recipients:
+            row = {"email": r["email"], "tg": r["telegram_chat_id"]}
+            if r["email"]:
+                ok, detail = send_email_brevo(r["email"], subject, body_text)
+                row["email_ok"] = ok
+                row["email_detail"] = detail
+            if r["telegram_chat_id"]:
+                row["tg_ok"] = send_telegram(r["telegram_chat_id"], body_html)
+            results.append(row)
+        trace["send_results"] = results
+
+    release_db(conn)
+    return JSONResponse({"trace": trace})
+
 @app.get("/admin/check-notif-prefs")
 async def admin_check_notif_prefs(request: Request):
     """Debug : liste les préférences de notification de chaque utilisateur."""
